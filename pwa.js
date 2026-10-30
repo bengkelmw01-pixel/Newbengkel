@@ -1,7 +1,7 @@
 /* Bengkel & Armada Monitoring - peluncur versi GitHub Pages / PWA.
    Tugas: (1) tahu alamat web app Apps Script, (2) memuat app.js, (3) mendaftarkan service worker. */
 (function () {
-  var P = window.BKA_PWA = { app: 'app.js?v=1d33ab4cc9' };
+  var P = window.BKA_PWA = { app: 'app.js?v=320a3a8522' };
   var OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?macros\/s\/[A-Za-z0-9_-]+\/exec$/;
 
   function ls(k, v) {
@@ -42,21 +42,38 @@
     document.body.classList.add('bka-setup');
     document.body.appendChild(box);
     var inp = box.querySelector('#bka-url'), btn = box.querySelector('#bka-go'), msg = box.querySelector('#bka-msg');
+    /* satu percobaan ke server; hasilnya {ok:1} atau {bad:'alasan singkat'} */
+    function probe(u, init) {
+      return fetch(u, init).then(function (r) {
+        return r.text().then(function (t) {
+          var o = null; try { o = JSON.parse(t); } catch (e) { /* bukan JSON */ }
+          return o && o.ok ? { ok: 1 } : { bad: 'balasan bukan JSON (kode ' + r.status + '): ' + t.replace(/\s+/g, ' ').slice(0, 70) };
+        });
+      }, function (e) { return { bad: 'tidak terhubung (' + String(e && e.message || e) + ')' }; });
+    }
+    function fail(post, get) {
+      var hint;
+      if (get.ok) hint = 'Server terbaca lewat GET tetapi gagal lewat POST. Kirim detail di bawah ke pembuat aplikasi.';
+      else if (/tidak terhubung/.test(post.bad) && /tidak terhubung/.test(get.bad)) hint = 'Server tidak menjawab. Biasanya akses Web App belum "Siapa saja": di Apps Script buka Deploy > Kelola deployment > pensil > Yang memiliki akses = Siapa saja > Deploy. Tes juga di jendela InPrivate/Incognito: buka alamat tadi + ?api=ping.';
+      else hint = 'Server tidak menjawab dengan benar. Pastikan Code.gs terbaru sudah di-deploy (Versi baru) dan akses Web App = "Siapa saja".';
+      btn.disabled = false; msg.style.color = '#d1203a'; msg.style.whiteSpace = 'pre-wrap';
+      msg.textContent = hint + '\n\nDetail\nPOST: ' + (post.ok ? 'berhasil' : post.bad) + '\nGET: ' + (get.ok ? 'berhasil' : get.bad);
+    }
     btn.onclick = function () {
       var v = String(inp.value || '').trim();
-      if (!OK.test(v)) { msg.textContent = 'Alamat tidak sesuai. Harus seperti https://script.google.com/macros/s/.../exec'; return; }
-      msg.style.color = '#6b7694'; msg.textContent = 'Menghubungi server...'; btn.disabled = true;
-      /* sama persis dengan panggilan aplikasi (POST teks biasa), supaya yang dites memang jalur yang nanti dipakai */
-      fetch(v, { method: 'POST', body: JSON.stringify({ fn: 'ping', a: [] }), credentials: 'omit', redirect: 'follow' }).then(function (r) { return r.json(); }).then(function (o) {
-        if (!o || !o.ok) throw 0;
+      if (!OK.test(v)) { msg.style.whiteSpace = ''; msg.textContent = 'Alamat tidak sesuai. Harus seperti https://script.google.com/macros/s/.../exec'; return; }
+      msg.style.color = '#6b7694'; msg.style.whiteSpace = ''; msg.textContent = 'Menghubungi server...'; btn.disabled = true;
+      /* POST teks biasa = jalur yang sama dengan aplikasi (yang dites memang jalur yang nanti dipakai); GET hanya untuk membedakan penyebab bila gagal */
+      Promise.all([
+        probe(v, { method: 'POST', body: JSON.stringify({ fn: 'ping', a: [] }), credentials: 'omit', redirect: 'follow' }),
+        probe(v + '?api=ping', { credentials: 'omit', redirect: 'follow' })
+      ]).then(function (r) {
+        if (!r[0].ok) return fail(r[0], r[1]);
         ls('bka_api', v);
         box.parentNode.removeChild(box);
         st.parentNode.removeChild(st);
         document.body.classList.remove('bka-setup');
         start();
-      }).catch(function () {
-        btn.disabled = false; msg.style.color = '#d1203a';
-        msg.textContent = 'Server tidak menjawab. Pastikan Code.gs terbaru sudah di-deploy (Versi baru) dan akses Web App = "Siapa saja".';
       });
     };
   }
