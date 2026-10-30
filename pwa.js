@@ -1,7 +1,7 @@
 /* Bengkel & Armada Monitoring - peluncur versi GitHub Pages / PWA.
    Tugas: (1) tahu alamat web app Apps Script, (2) memuat app.js, (3) mendaftarkan service worker. */
 (function () {
-  var P = window.BKA_PWA = { app: 'app.js?v=644e84c387' };
+  var P = window.BKA_PWA = { app: 'app.js?v=1d33ab4cc9' };
   var OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?macros\/s\/[A-Za-z0-9_-]+\/exec$/;
 
   function ls(k, v) {
@@ -27,13 +27,19 @@
   function setup() {
     var box = document.createElement('div');
     box.id = 'bka-setup';
-    box.style.cssText = 'max-width:460px;margin:0 auto;padding:28px 18px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f1b4d';
+    box.style.cssText = 'max-width:460px;margin:0 auto;padding:12vh 18px 28px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0f1b4d';
     box.innerHTML =
       '<h2 style="margin:0 0 6px;color:#0b3bb8">Bengkel &amp; Armada Monitoring</h2>' +
       '<p style="margin:0 0 16px;color:#6b7694">Pertama kali dibuka: tempel alamat Web App (Apps Script) yang berakhiran <b>/exec</b>.</p>' +
       '<input id="bka-url" type="url" inputmode="url" autocomplete="off" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%;padding:12px;border:1px solid #cfd8ee;border-radius:12px;font-size:15px;box-sizing:border-box">' +
       '<button id="bka-go" type="button" style="margin-top:12px;width:100%;padding:13px;border-radius:12px;background:#1a4fd8;color:#fff;font-weight:700;font-size:16px;border:0">Simpan &amp; buka</button>' +
       '<p id="bka-msg" style="min-height:22px;margin:12px 0 0;color:#d1203a"></p>';
+    /* selama layar alamat tampil, sembunyikan kerangka aplikasi (menu, bilah atas) supaya hanya formulir yang terlihat */
+    var st = document.createElement('style');
+    st.id = 'bka-setup-css';
+    st.textContent = 'body.bka-setup>*:not(#bka-setup){display:none!important}';
+    document.head.appendChild(st);
+    document.body.classList.add('bka-setup');
     document.body.appendChild(box);
     var inp = box.querySelector('#bka-url'), btn = box.querySelector('#bka-go'), msg = box.querySelector('#bka-msg');
     btn.onclick = function () {
@@ -45,6 +51,8 @@
         if (!o || !o.ok) throw 0;
         ls('bka_api', v);
         box.parentNode.removeChild(box);
+        st.parentNode.removeChild(st);
+        document.body.classList.remove('bka-setup');
         start();
       }).catch(function () {
         btn.disabled = false; msg.style.color = '#d1203a';
