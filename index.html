@@ -345,6 +345,8 @@ body.on-nomo .toast{bottom:104px}
 .pkfs-no{display:flex;gap:9px;align-items:flex-start;background:#fff1e0;border:1.5px solid #f6c590;color:#b45309;border-radius:12px;padding:11px 12px;font-weight:800;line-height:1.35}
 .pkfs-no .ic{width:21px;height:21px;margin-top:1px}.pkfs-no small{display:block;font-weight:600;font-size:12.5px;margin-top:3px;color:#8a4a0a}
 .pkfs-chk{margin-top:8px}.pkfs-chk .ic{margin-right:4px}
+.pkfs-cap{margin-top:10px}.pkfs-ct{font-weight:700;font-size:13.5px;line-height:1.3;margin-bottom:8px;color:var(--ink)}.pkfs-ct small{display:block;font-weight:500;color:var(--muted);font-size:12px;margin-top:2px;line-height:1.35}
+.pkfs-send{margin-top:10px}.pkfs-send[disabled]{opacity:.55}.pkfs-chk2{margin-top:10px;display:flex;align-items:center;justify-content:center;gap:5px;width:100%}
 .pkfs-hint{margin-top:6px;text-align:center;color:var(--muted);font-size:12.5px}
 .pkph{margin-top:14px}
 .pkph-h{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700;font-size:14px;color:var(--ink);margin-bottom:8px}
@@ -447,6 +449,21 @@ body.on-nomo .toast{bottom:104px}
 .lj-tbl a,.lj-tbl .lj-lnk{color:#0a3fd0;text-decoration:underline;cursor:pointer;font-weight:500}
 .lj-tbl tr.lj-click{cursor:pointer}.lj-tbl tr.lj-click:hover td{background:#eef4ff}
 .lj-run{color:#0a3fd0;font-weight:800}
+.lj-tbl .mo,.lj-tbl .mo-c{display:none}
+@media (max-width:640px){
+  /* tabel jam kerja muat penuh di layar HP (tanpa digeser ke samping): kolom NIP / Jabatan / Jam Selesai / Total Menit digabung ke kolom sebelahnya */
+  .lj-box{padding:10px 8px 8px}
+  .lj-tw{overflow-x:visible}
+  .lj-tbl{min-width:0!important;table-layout:auto;font-size:12px}
+  .lj-tbl th{font-size:11px;padding:9px 3px;line-height:1.2}
+  .lj-tbl td{padding:9px 3px;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
+  .lj-tbl .dk,.lj-tbl .dk-c{display:none}
+  .lj-tbl td.mo-c,.lj-tbl th.mo-c{display:table-cell}
+  .lj-tbl small.mo{display:block;font-size:10px;font-weight:500;color:#5b6b99;margin-top:2px}
+  .lj-tbl span.mo{display:inline}
+  .lj-tbl td.l{padding-left:5px}
+  .lj-bar{display:none!important}
+}
 .lj-bar{display:flex;align-items:center;gap:8px;margin-top:10px;color:#1a4fd8}
 .lj-bb{width:22px;height:22px;display:grid;place-items:center;color:#1a4fd8}
 .lj-bb .ic{width:18px;height:18px}.lj-bb .ic.flip{transform:scaleX(-1)}
