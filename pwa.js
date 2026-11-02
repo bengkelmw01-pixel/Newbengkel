@@ -1,7 +1,7 @@
 /* Bengkel & Armada Monitoring - peluncur versi GitHub Pages / PWA.
    Tugas: (1) tahu alamat web app Apps Script, (2) memuat app.js, (3) mendaftarkan service worker. */
 (function () {
-  var P = window.BKA_PWA = { app: 'app.js?v=6a835f348b' };
+  var P = window.BKA_PWA = { app: 'app.js?v=f9fcd04e87' };
   var OK = /^https:\/\/script\.google\.com\/(a\/macros\/[^\/]+\/)?macros\/s\/[A-Za-z0-9_-]+\/exec$/;
 
   function ls(k, v) {
