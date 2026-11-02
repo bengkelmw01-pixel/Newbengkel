@@ -748,6 +748,7 @@ function monModel() {
   order.forEach(function (n) {
     var x = U[n]; x.st = x.run ? 'run' : (x.qc ? 'qc' : (x.q.length ? 'ant' : (x.ok ? 'ok' : 'ant')));
     c[x.st]++; if (x.w) c.masuk++;
+    if (x.qc && x.st !== 'qc') c.qc++;          /* unit yang sedang dikerjakan di bagian lain (mis. PEM) tetapi pekerjaan sebelumnya (mis. Cat) menunggu QC: tetap dihitung Sedang QC, sama dengan tabel Quality Control */
     if (x.st === 'ok') ok.push(x); else if (x.st === 'ant') ant.push(x);
   });
   var onlyTd = function (x) { return !x.q.length || x.q.every(function (z) { return z.td; }) ? 1 : 0; };      /* antrian yang seluruhnya tunda ada paling bawah */
