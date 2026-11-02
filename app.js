@@ -766,6 +766,34 @@ function monModel() {
   ev.sort(function (a, b) { return b.t - a.t; });
   return { c: c, ok: ok, ant: ant, ev: ev.slice(0, 5) };
 }
+function monWaitTxt(a) {                      /* lama menunggu Pengecekan (menit sejak pekerjaan selesai dikerjakan mekanik) */
+  if (a == null) return '-';
+  var n = new Date(), d = n.getHours() * 60 + n.getMinutes() - a; if (d < 0) d += 1440;
+  return monDur(d);
+}
+/* rekap SEMUA pekerjaan pada tanggal papan (dibuka dengan mengetuk kotak SELESAI SERVICE); jumlah per status dihitung dari baris yang sama */
+function monRekapInner() {
+  var M = S.mon, jobs = (M.jobs || []).slice(), cnt = { run: 0, tn: 0, qc: 0, ok: 0 }, units = {};
+  var rows = jobs.map(function (r, i) {
+    var st, cls, ex = '', apv = r.ap === 'Disetujui', w = apv ? monWa(r.wa) : null;
+    units[r.n] = 1;
+    if (!r.e) { st = 'Sedang dikerjakan'; cls = 'mn-o'; cnt.run++; }
+    else if (r.st === 'Tunda') { st = 'Ditunda'; cls = 'mn-v'; cnt.tn++; ex = r.tc ? '<small>' + esc(r.tc) + '</small>' : ''; }
+    else if (apv || r.ap === 'Lama') { st = 'Selesai'; cls = 'mn-g'; cnt.ok++; }
+    else { st = 'Pengecekan'; cls = 'mn-o'; cnt.qc++; }
+    return monRow([i + 1, esc(r.nm), '<span class="mn-car">' + esc(r.n) + '</span>', esc(monJenis(r)), esc(r.s || '-'), r.e ? esc(r.e) : '-', r.e ? esc(monDur(r.m)) : '-',
+      '<span class="mn-st ' + cls + '">' + st + '</span>' + ex, apv ? esc(r.pw || '-') + (w ? '<small>' + w.hm + '</small>' : '') : '-']);
+  });
+  var nu = Object.keys(units).length;
+  return '<div class="mn-rks"><span>' + jobs.length + ' pekerjaan</span><span>' + nu + ' unit</span><span class="mn-g">' + cnt.ok + ' selesai QC</span><span class="mn-o">' + cnt.qc + ' menunggu QC</span><span class="mn-o">' + cnt.run + ' dikerjakan</span><span class="mn-v">' + cnt.tn + ' ditunda</span></div>' +
+    '<div class="mn-rkw">' + monTable(['No', 'Petugas', 'Nomor Mobil', 'Jenis Service', 'Mulai', 'Selesai', 'Durasi', 'Status', 'Supervisor QC'], [5, 13, 13, 15, 8, 8, 10, 15, 13], rows, 'Belum ada pekerjaan service hari ini.') + '</div>';
+}
+function monRekap() {
+  var p = isoParts(S.mon.d || todayIso());
+  showModal('<div class="sh-head"><b>Rekap Pekerjaan Hari Ini</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="mn-rkd">' + monDate(new Date(p.y, p.m - 1, p.d)) + '</div><div id="mon_rk">' + monRekapInner() + '</div>');
+  var sh = $('#modal .sheet'); if (sh) sh.classList.add('wide');
+}
 function monRow(cells, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + cells.join('</td><td>') + '</td></tr>'; }
 function monTable(head, widths, rows, empty) {
   return '<table class="mn-t"><colgroup>' + widths.map(function (w) { return '<col style="width:' + w + '%">'; }).join('') + '</colgroup><thead><tr>' +
@@ -777,17 +805,16 @@ function monBody() {
   var M = S.mon;
   if (!M.jobs) return M.err ? '<div class="err">Papan belum bisa dimuat: ' + esc(M.err) + (/tidak dikenal|not a function|getMonitor/i.test(M.err) ? '<br>Server belum diperbarui: tempel Code.gs terbaru di Apps Script, lalu Deploy &gt; Kelola deployment &gt; Edit &gt; Versi baru &gt; Deploy.' : '') + ' <a data-act="monref">Coba lagi</a></div>' : '<div class="loading"><div class="spinner"></div><div>Memuat papan monitoring...</div></div>';
   var m = monModel(), c = m.c, jobs = M.jobs;
-  var svc = jobs.map(function (r, i) {
+  /* tabel atas hanya pekerjaan yang sedang dikerjakan / ditunda. Yang sudah selesai oleh mekanik pindah ke tabel Quality Control; yang sudah lolos QC keluar dari tabel dan masuk hitungan Selesai Service (rekap: klik kotak Selesai Service) */
+  var svc = jobs.filter(function (r) { return !r.e || r.st === 'Tunda'; }).map(function (r, i) {
     var run = !r.e, tn = r.st === 'Tunda';
     return monRow([i + 1, esc(r.nm), '<span class="mn-car">' + esc(r.n) + '</span>', esc(monJenis(r)), esc(r.s || '-'),
       '<span class="mn-st ' + (run ? 'mn-o' : (tn ? 'mn-v' : 'mn-g')) + '">' + (run ? 'Sedang dikerjakan' : (tn ? 'Ditunda' : 'Selesai')) + '</span>',
       run ? '-' : esc(r.e), run ? '-' : esc(monDur(r.m))]);
   });
-  var qcs = jobs.filter(function (r) { return r.e && r.st !== 'Tunda' && r.ap !== 'Lama'; }).sort(function (a, b) { return (tmin(a.e) || 0) - (tmin(b.e) || 0); }).map(function (r, i) {
-    var ok = r.ap === 'Disetujui', w = ok ? monWa(r.wa) : null;
-    return monRow([i + 1, '<span class="mn-car">' + esc(r.n) + '</span><small>' + esc(monJenis(r)) + '</small>', esc(r.e),
-      '<span class="mn-st ' + (ok ? 'mn-g' : 'mn-o') + '">' + (ok ? 'Sudah selesai' : 'Pengecekan') + '</span>',
-      w ? w.hm : '-', ok ? monDur(monQcDur(r)) : '-', ok ? esc(r.pw || '-') : '-']);
+  var qcs = jobs.filter(function (r) { return r.e && r.st !== 'Tunda' && r.ap !== 'Lama' && r.ap !== 'Disetujui'; }).sort(function (a, b) { return (tmin(a.e) || 0) - (tmin(b.e) || 0); }).map(function (r, i) {
+    return monRow([i + 1, '<span class="mn-car">' + esc(r.n) + '</span><small>' + esc(monJenis(r)) + '</small>', esc(r.nm), esc(r.e),
+      '<span class="mn-st mn-o">Pengecekan</span>', '<span data-qw="' + (tmin(r.e) == null ? '' : tmin(r.e)) + '">' + monWaitTxt(tmin(r.e)) + '</span>']);
   });
   var chips = function (list, empty, tag) {
     return '<div class="mn-chips">' + (list.length ? list.map(function (x) {
@@ -801,19 +828,19 @@ function monBody() {
     x.q.forEach(function (z) { var l = (MON_Q[z.j] || z.j) + (z.td ? ' (tunda)' : ''); if (tt.indexOf(l) < 0) tt.push(l); if (!z.td) td = false; });
     return { t: tt.join(', '), td: td };
   };
-  var tile = function (cls, lab, v, k) { return '<div class="mn-tile ' + cls + '"><small>' + lab + '</small><b data-k="' + k + '">' + v + '</b></div>'; };
+  var tile = function (cls, lab, v, k, tap) { return '<div class="mn-tile ' + cls + (tap ? ' mn-tap' : '') + '"' + (tap ? ' data-act="monrekap" role="button" tabindex="0" title="Lihat rekap pekerjaan hari ini"' : '') + '><small>' + lab + '</small><b data-k="' + k + '">' + v + '</b>' + (tap ? '<em>Klik: rekap hari ini &rsaquo;</em>' : '') + '</div>'; };
   var info = m.ev.length ? m.ev.map(function (e) { return '<p><span class="t">' + esc(e.x) + '</span>' + e.h + '</p>'; }).join('') : '<p>Belum ada pekerjaan hari ini.</p>';
   var at = M.at ? hm(M.at) + ':' + ('0' + new Date(M.at).getSeconds()).slice(-2) : '-';
   return '<div class="mn-body">' +
     '<div class="mn-l">' +
-      monPanel('mn-red', 'PEKERJAAN SERVICE', monTable(['No', 'Petugas', 'Nomor Mobil', 'Jenis Service', 'Waktu Mulai', 'Status', 'Waktu Selesai', 'Durasi'], [5, 14, 16, 17, 10, 17, 11, 10], svc, 'Belum ada pekerjaan service hari ini.'), 'mon_svc') +
-      monPanel('mn-blu', 'QUALITY CONTROL SUPERVISOR', monTable(['No', 'Nomor Mobil', 'Waktu Mulai', 'Status', 'Waktu Selesai', 'Durasi', 'Supervisor'], [5, 18, 12, 20, 13, 13, 19], qcs, 'Belum ada pekerjaan yang masuk Pengecekan.'), 'mon_qc') +
+      monPanel('mn-red', 'PEKERJAAN SERVICE', monTable(['No', 'Petugas', 'Nomor Mobil', 'Jenis Service', 'Waktu Mulai', 'Status', 'Waktu Selesai', 'Durasi'], [5, 14, 16, 17, 10, 17, 11, 10], svc, 'Tidak ada pekerjaan yang sedang dikerjakan.'), 'mon_svc') +
+      monPanel('mn-blu', 'QUALITY CONTROL SUPERVISOR', monTable(['No', 'Nomor Mobil', 'Petugas', 'Mulai QC', 'Status', 'Menunggu'], [5, 22, 20, 13, 21, 19], qcs, 'Tidak ada pekerjaan yang menunggu Pengecekan.'), 'mon_qc') +
     '</div>' +
     '<div class="mn-r">' +
       monPanel('mn-blu', 'MOBIL SELESAI PERBAIKAN', chips(m.ok, 'Belum ada mobil yang selesai.'), 'mon_ok') +
       monPanel('mn-grn', 'ANTRIAN SERVICE', chips(m.ant, 'Tidak ada antrian.', antTag), 'mon_ant') +
     '</div>' +
-    '<div class="mn-tiles">' + tile('mn-tn', 'TOTAL UNIT MASUK', c.masuk, 'masuk') + tile('mn-tg', 'SELESAI SERVICE', c.ok, 'ok') + tile('mn-to', 'SEDANG DIKERJAKAN', c.run, 'run') + tile('mn-tq', 'SEDANG QC', c.qc, 'qc') + '</div>' +
+    '<div class="mn-tiles">' + tile('mn-tn', 'TOTAL UNIT MASUK', c.masuk, 'masuk') + tile('mn-tg', 'SELESAI SERVICE', c.ok, 'ok', true) + tile('mn-to', 'SEDANG DIKERJAKAN', c.run, 'run') + tile('mn-tq', 'SEDANG QC', c.qc, 'qc') + '</div>' +
     '<div class="mn-info" id="mon_info"><h3>INFORMASI</h3>' + info + '</div>' +
     '</div>' +
     '<p class="mn-ft' + (M.err ? ' bad' : '') + '">' + (M.err ? 'Gagal memperbarui (' + esc(M.err) + '). ' : '') + (M.fe ? 'Sebagian data: ' + esc(M.fe) + '. ' : '') + 'Realtime dari input mekanik &middot; diperbarui <span id="mon_at">' + at + '</span> &middot; otomatis tiap ' + Math.round(MON_MS / 1000) + ' detik &middot; <a data-act="monref">Perbarui sekarang</a></p>';
@@ -829,6 +856,7 @@ function monUi() {
   if (S.view !== 'mon') return;
   var b = $('#monb'); if (!b) return;
   var y = window.pageYOffset; b.innerHTML = monBody(); window.scrollTo(0, y);
+  var rk = $('#mon_rk'); if (rk && S.mon.jobs) rk.innerHTML = monRekapInner();          /* rekap yang sedang dibuka ikut diperbarui */
 }
 function monFetch(force) {
   var M = S.mon;
@@ -845,6 +873,7 @@ function monTick() {
   var t = $('#mon_t'); if (!t) return;
   var n = new Date(); t.textContent = hm(n) + ':' + ('0' + n.getSeconds()).slice(-2);
   var d = $('#mon_d'); if (d) d.textContent = monDate(n);
+  Array.prototype.forEach.call(document.querySelectorAll('[data-qw]'), function (el) { var a = el.getAttribute('data-qw'), x = monWaitTxt(a === '' ? null : +a); if (el.textContent !== x) el.textContent = x; });          /* lama menunggu Pengecekan jalan terus */
   if (S.mon.d && todayIso() !== S.mon.d) monFetch();
 }
 setInterval(monTick, 1000);
@@ -3563,6 +3592,7 @@ var ACT = {
     if (d) rsExport([d], 'Mobil ' + d.n + '   |   Service ' + d.sv, 'Laporan Reservasi ' + d.n + ' ' + d.sv + '.xlsx');
   },
   monref: function () { monFetch(true); },
+  monrekap: function () { if (S.mon.jobs) monRekap(); },
   part: function () { var s = $('#partSub'), a = $('#partArrow'); var hide = s.style.display !== 'none'; s.style.display = hide ? 'none' : ''; a.classList.toggle('open', !hide); },
   back: function () { go(S.view === 'rsvform' ? 'rsv' : S.view === 'rsv' ? 'mon' : S.view === 'lapfokus' ? (S.ls.from === 'appr' ? 'appr' : 'lapsvc') : S.view === 'appr' ? 'mon' : S.view === 'nomo' ? 'jobpk' : S.view === 'tb' || S.view === 'pem' || S.view === 'las' || S.view === 'lc' ? 'tbmenu' : S.view === 'ck' || S.view === 'tbmenu' || S.view === 'jobcs' ? 'jobmek' : (S.view === 'jobpk' ? (S.pk.job && S.pk.job.ck ? kdOf(S.pk.job) : 'jobmek') : (S.prev && S.prev !== S.view ? S.prev : 'mon'))); },
   sync: function () {
