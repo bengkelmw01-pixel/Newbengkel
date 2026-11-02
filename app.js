@@ -103,6 +103,7 @@ function load(force) {
   S.loading = true; syncUi();
   return gs('getData', [!!force]).then(function (d) {
     S.data = d; S.loading = false; S.lastLoad = Date.now(); S.srcOld = !(d && d.src);
+    svSet(d && d.av);
     derive(); cacheSave(); syncUi();
     rerender();
     if (!S.pfDone && window.BKA_PREFETCH_MS !== -1) { S.pfDone = 1; setTimeout(ckWarm, window.BKA_PREFETCH_MS != null ? window.BKA_PREFETCH_MS : 1200); }
@@ -119,6 +120,7 @@ function poll() {
   S.polling = true;
   return gs('getUpdate', [S.data.ver || '']).then(function (r) {
     S.polling = false; S.lastLoad = Date.now(); chk();
+    if (r && r.av) svSet(r.av);
     if (r && !r.same && r.master !== undefined) { S.data = r; derive(); cacheSave(); rerender(); }
   }, function () {
     S.polling = false;
@@ -201,8 +203,12 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
+var APP_BUILD = '2026-11-02 15:58';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
+function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
+function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
 function foot() {
-  return '<p class="foot">Sinkron otomatis dari Google Sheet' + (S.data && S.data.src ? ' (' + esc(S.data.src) + ')' : '') + ' &middot; terakhir dicek <span id="lastchk">' + hm(S.lastLoad || Date.now()) + '</span> &middot; <a data-act="sync">Sinkron sekarang</a></p>';
+  return '<p class="foot">Sinkron otomatis dari Google Sheet' + (S.data && S.data.src ? ' (' + esc(S.data.src) + ')' : '') + ' &middot; terakhir dicek <span id="lastchk">' + hm(S.lastLoad || Date.now()) + '</span> &middot; <a data-act="sync">Sinkron sekarang</a><br><small class="fver">' + verHtml() + '</small></p>';
 }
 function nchip(n) { return '<span class="nchip">' + ic('car', 'sm') + esc(n) + '</span>'; }
 
@@ -3415,6 +3421,7 @@ function jbFetch(force) {
   return gs('getJobBadge', [meNip()]).then(function (r) {
     J.busy = false; J.at = Date.now();
     if (r && r.ok) ['ck', 'cat', 'las', 'pem', 'tdt', 'tdk'].forEach(function (k) { J[k] = typeof r[k] === 'number' ? r[k] : null; });
+    if (r && r.ok) svSet(r.ver);
     jbUi();
   }, function () { J.busy = false; });          /* gagal (sinyal / server lama): angka lama dipertahankan, tidak mengganggu pekerjaan */
 }
