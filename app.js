@@ -720,16 +720,16 @@ function monDate(n) { return (HARI[n.getDay()] + ', ' + n.getDate() + ' ' + BULA
 /* satu mobil = satu unit: dikerjakan > Pengecekan (QC) > antrian > selesai */
 function monModel() {
   var M = S.mon, jobs = M.jobs || [], q = M.q || [], U = {}, order = [];
-  function u(n) { if (!U[n]) { U[n] = { n: n, run: 0, qc: 0, ok: 0, tn: 0, q: [] }; order.push(n); } return U[n]; }
+  function u(n) { if (!U[n]) { U[n] = { n: n, w: 0, run: 0, qc: 0, ok: 0, tn: 0, q: [] }; order.push(n); } return U[n]; }
   jobs.forEach(function (r) {
-    var x = u(r.n);
+    var x = u(r.n); x.w++;
     if (!r.e) x.run++; else if (r.st === 'Tunda') x.tn++; else if (r.ap === 'Disetujui') x.ok++; else x.qc++;
   });
   q.forEach(function (r) { u(r.n).q.push(r); });
-  var c = { masuk: order.length, run: 0, qc: 0, ant: 0, ok: 0 }, ok = [], ant = [];
+  var c = { masuk: 0, run: 0, qc: 0, ant: 0, ok: 0 }, ok = [], ant = [];      /* masuk = mobil yang sedang / sudah dikerjakan mekanik hari ini (bukan jumlah laporan / antrian) */
   order.forEach(function (n) {
     var x = U[n]; x.st = x.run ? 'run' : (x.qc ? 'qc' : (x.q.length ? 'ant' : (x.ok ? 'ok' : 'ant')));
-    c[x.st]++;
+    c[x.st]++; if (x.w) c.masuk++;
     if (x.st === 'ok') ok.push(x); else if (x.st === 'ant') ant.push(x);
   });
   var onlyTd = function (x) { return !x.q.length || x.q.every(function (z) { return z.td; }) ? 1 : 0; };      /* antrian yang seluruhnya tunda ada paling bawah */
@@ -802,8 +802,7 @@ function monBody() {
 function vMon() {
   var n = new Date();
   return '<section class="pad mn">' + errBanner() +
-    (isApv() ? '<button class="ap-dash" data-go="appr">' + ic('shield') + '<div><b>Approval</b><span id="apdt">' + (S.ap.rows ? (S.ap.rows.length ? S.ap.rows.length + ' pekerjaan menunggu persetujuan Anda' : 'Tidak ada pekerjaan yang menunggu') : 'Memuat...') + '</span></div>' + ic('chev', 'go') + '</button>' : '') +
-    '<div class="mn-hd"><img src="' + LJ_IMG + '" alt=""><div class="mn-ht"><h1>MONITORING SERVICE BENGKEL</h1><p>' + MON_POOL + '</p><p id="mon_d">' + monDate(n) + '</p></div>' +
+        '<div class="mn-hd"><img src="' + LJ_IMG + '" alt=""><div class="mn-ht"><h1>MONITORING SERVICE BENGKEL</h1><p>' + MON_POOL + '</p><p id="mon_d">' + monDate(n) + '</p></div>' +
     '<div class="mn-clk"><small><span class="mn-live"></span>JAM SAAT INI</small><b id="mon_t">' + hm(n) + ':' + ('0' + n.getSeconds()).slice(-2) + '</b></div></div>' +
     '<div id="monb">' + monBody() + '</div></section>';
 }
