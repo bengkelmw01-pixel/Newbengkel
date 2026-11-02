@@ -30,6 +30,7 @@ var S = {
   ls: { d: '', rm: '', mode: 'hari', jenis: 'all', q: '', rows: {}, busy: {}, err: '', open: '', det: {}, dl: 0 },
   me: null, auth: 'wait', loginNip: '', loginErr: '', loginBusy: false,
   users: { rows: null, presets: [], setup: false, err: '', busy: false, old: '', ak: null },
+  zp: { rows: null, done: [], h: '', busy: false, err: '', last: 0 }, iz: null,
   ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
   td: { rows: null, ssel: [], sel: [], loc: [], h: '', busy: false, err: '' },
   rs: { cand: null, pend: [], done: [], h: '', busy: false, err: '', last: 0, tab: '', q: '', f: null, saving: 0, dl: 0 },
@@ -132,8 +133,9 @@ function syncUi() {
 
 /* ---------- navigation ---------- */
 function go(v) {
+  if (isPkl() && PKL_VIEWS.indexOf(v) < 0) v = 'jobmek';          /* PKL hanya boleh membuka halaman pekerjaan */
   if (v === 'pengaturan' && !isAdmin()) { toast('Menu Pengaturan khusus Admin.', true); return; }
-  if (v === 'appr' && !isApv()) { toast('Menu Approval khusus Group Head / Section Head.', true); return; }
+  if (v === 'appr' && !isApv() && !canIzin()) { toast('Menu Approval khusus Group Head / Section Head.', true); return; }
   if ((v === 'lapsvc' || v === 'lapfokus') && !canMenu('ls')) { toast('Akun Anda tidak punya akses ke menu Laporan Service.', true); return; }
   if ((v === 'rsv' || v === 'rsvform') && !canMenu('rsv')) { toast('Akun Anda tidak punya akses ke menu Reservasi.', true); return; }
   if (v === 'appr' || v === 'lapsvc') S.ls.from = '';
@@ -172,7 +174,7 @@ function go(v) {
   if (v === 'lc') lcFetch(true);
   if (v === 'lapfokus') { lsFetch(lsYm()); lsDetail(S.ls.open); }
   if (v === 'pengaturan') usFetch();
-  if (v === 'appr') apFetch(true);
+  if (v === 'appr') { apFetch(true); izFetch(true); }
   if (v === 'rsv') rsFetch(true);
   if (v === 'jobpk' && !S.pk.job) tdFetch();
 }
@@ -210,6 +212,8 @@ var LJ_IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPMAAACsCAYAAACuLpod
 function renderShell() {
   var m = $('#main');
   document.body.classList.toggle('on-login', S.auth === 'login');
+  document.body.classList.toggle('is-pkl', isPkl());
+  if (isPkl() && PKL_VIEWS.indexOf(S.view) < 0) S.view = 'jobmek';
   meUi();
   if (S.auth === 'login') { m.innerHTML = vLogin(); return; }
   if (S.auth === 'wait') { m.innerHTML = '<div class="loading"><div class="spinner"></div><div>Memeriksa akun...</div></div>'; return; }
@@ -268,7 +272,7 @@ function vDash() {
       (stat ? '<div class="stat"><div>' + ic('gauge') + '<b>' + esc(stat[0]) + '</b></div><div>' + ic('car') + '<b>' + stat[1] + '</b><span>Unit</span></div></div>' : '') + '</button>';
   }
   return banner() + '<section class="pad">' + errBanner() +
-    (isApv() ? '<button class="ap-dash" data-go="appr">' + ic('shield') + '<div><b>Approval</b><span id="apdt">' + (S.ap.rows ? (S.ap.rows.length ? S.ap.rows.length + ' pekerjaan menunggu persetujuan Anda' : 'Tidak ada pekerjaan yang menunggu') : 'Memuat...') + '</span></div>' + ic('chev', 'go') + '</button>' : '') +
+    (isApv() || canIzin() ? '<button class="ap-dash" data-go="appr">' + ic('shield') + '<div><b>Approval</b><span id="apdt">' + apDt() + '</span></div>' + ic('chev', 'go') + '</button>' : '') +
     '<div class="grid2 d">' +
     card('teknik', 'c-vio', 'teknik', 'Service Teknik', [labT, nt]) +
     card('ki', 'c-grn', 'ki', 'Service Keindahan', [labK, nk]) +
@@ -300,8 +304,9 @@ var JOBS = [
   { k: 'PS', t: 'Preventive Supporting', cls: 'j-ps', img: 'ps', acc: function () { return can('ps'); } }
 ];
 function vJob() {
-  return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Job Mekanik</h2></div>' +
-    '<section class="pad">' + errBanner() + '<div class="jobs">' + JOBS.map(function (j) {
+  var pk = isPkl(), lst = pk ? JOBS.filter(function (j) { return j.acc ? j.acc() : true; }) : JOBS;
+  return '<div class="subhead">' + (pk ? '' : '<button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button>') + '<h2>Job Mekanik</h2></div>' +
+    '<section class="pad">' + errBanner() + (pk ? '<div class="ap-note">' + ic('shield') + '<div>Sebelum mulai mengerjakan, Anda perlu ACC dari Section Head / Group Head atau Devi. Tekan <b>Kerjakan</b>, lalu tunggu sampai disetujui.</div></div>' : '') + (pk && !lst.length ? '<div class="empty">Belum ada pekerjaan yang diberikan ke akun Anda.<br><small>Hubungi admin.</small></div>' : '') + '<div class="jobs">' + lst.map(function (j) {
       var okj = j.acc ? j.acc() : true;
       return '<button class="jcard ' + j.cls + (okj ? '' : ' lock') + '" ' + (okj ? 'data-go="' + (j.go || 'soon:' + esc(j.t)) + '"' : 'data-act="nojob" data-a="' + esc(j.t) + '"') + ' aria-label="' + esc(j.t) + '"><img class="jimg" src="' + JOB_IMG[j.img] + '" alt="">' +
         (okj ? (j.vo && j.vo() ? '<span class="jlk vo">' + ic('search') + 'Hanya lihat</span>' : '') : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + '<span class="jbadge">' + j.k + '</span><span class="jt">' + j.t.replace(' ', '<br>') + '</span></button>';
@@ -317,6 +322,7 @@ var TBSVG = {
 };
 function vTbMenu() {
   var L = [{ k: 'cat', t: 'Cat', go: 'tb' }, { k: 'las', t: 'Las', go: 'las' }, { k: 'pem', t: 'PEM', go: 'pem' }, { k: 'lc', t: 'LC', go: 'lc' }];
+  if (isPkl()) L = L.filter(function (x) { return x.k === 'lc' ? can('cat') : canView(x.k); });          /* PKL: hanya ikon yang diberikan */
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Tabrak</h2></div>' +
     '<section class="pad">' + errBanner() + '<div class="jobs">' + L.map(function (x) {
       var okx = x.k === 'lc' ? can('cat') : canView(x.k), vox = okx && x.k !== 'lc' && !can(x.k), nm = x.k === 'lc' ? 'LC (Tabrak Cat)' : 'Tabrak ' + x.t;
@@ -586,10 +592,11 @@ function usFetch() {
    APPROVAL (Group Head / Section Head) berdiri sendiri: hanya melihat + menyetujui; boleh ditambahkan ke kode lain, mis. "CK,APPROVAL". */
 var AK_JOBS = [['TEKNIK', 'Teknik'], ['KI', 'Keindahan'], ['CAT', 'Cat'], ['CK', 'CK'], ['PS', 'PS'], ['CS', 'CS'], ['LAS', 'Las'], ['PEM', 'PEM']];
 function akParse(s) {
-  var o = { admin: false, apv: false, rsv: false, ls: false, set: {} };
+  var o = { admin: false, apv: false, izin: false, rsv: false, ls: false, set: {} };
   String(s == null ? '' : s).toUpperCase().split(/[^A-Z]+/).forEach(function (w) {
     if (!w) return;
     if (w === 'APPROVAL' || w === 'APPROVER') o.apv = true;
+    else if (w === 'IZINPKL') o.izin = true;
     else if (w === 'RESERVASI') o.rsv = true;
     else if (w === 'LAPSERVICE' || w === 'LAPORAN' || w === 'LAPSVC') o.ls = true;
     else if (w === 'ADMIN') o.admin = true;
@@ -612,6 +619,7 @@ function akVal(o) {
   if (!o.admin && o.rsv) t.push('RESERVASI');          /* Admin sudah termasuk semua menu */
   if (!o.admin && o.ls) t.push('LAPSERVICE');
   if (o.apv) t.push('APPROVAL');
+  if (o.izin && !o.apv) t.push('IZINPKL');          /* Approval sudah termasuk meng-ACC izin PKL */
   return t.join(',');
 }
 function akLb(s) {
@@ -626,6 +634,7 @@ function akLb(s) {
     t = pt.join(', ');
   }
   if (o.apv) return t ? t + ' + Approval' : 'Approval (hanya melihat + menyetujui)';
+  if (o.izin) return t ? t + ' + Izin PKL' : 'Izin PKL (hanya meng-ACC mulai kerja PKL)';
   return t || 'Belum ada akses';
 }
 function akChips(o) {
@@ -637,6 +646,7 @@ function akChips(o) {
     '<button type="button" class="ak-ch sp' + (all ? ' on' : '') + '" data-act="usak" data-a="SEMUA" aria-pressed="' + (all ? 'true' : 'false') + '">' + (all ? ic('check', 'sm') : '') + 'Semua pekerjaan</button>' +
     '<button type="button" class="ak-ch sp adm' + (o.admin ? ' on' : '') + '" data-act="usak" data-a="ADMIN" aria-pressed="' + (o.admin ? 'true' : 'false') + '">' + (o.admin ? ic('check', 'sm') : ic('shield', 'sm')) + 'Admin</button>' +
     '<button type="button" class="ak-ch sp apv' + (o.apv ? ' on' : '') + '" data-act="usak" data-a="APPROVAL" aria-pressed="' + (o.apv ? 'true' : 'false') + '">' + (o.apv ? ic('check', 'sm') : ic('shield', 'sm')) + 'Approval</button>' +
+    '<button type="button" class="ak-ch sp izn' + (o.izin || o.apv ? ' on' : '') + (o.apv ? ' lkv' : '') + '" data-act="usak" data-a="IZINPKL" aria-pressed="' + (o.izin || o.apv ? 'true' : 'false') + '">' + (o.izin || o.apv ? ic('check', 'sm') : ic('shield', 'sm')) + 'Izin PKL</button>' +
     '<span class="ak-sp"></span>' + [['RESERVASI', 'Reservasi', 'rsv'], ['LAPSERVICE', 'Laporan service', 'ls']].map(function (m) {
       var on = o.admin || o.apv || o[m[2]], lk = o.admin ? ' lk' : (o.apv ? ' lkv' : '');          /* Admin dan Approval otomatis punya akses menu ini */
       return '<button type="button" class="ak-ch mn' + (on ? ' on' : '') + lk + '" data-act="usak" data-a="' + m[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + (on ? ic('check', 'sm') : '') + m[1] + '</button>';
@@ -1201,6 +1211,11 @@ function canKd(kd) { return can(kd === 'tb' ? 'cat' : kd); }      /* kd Tabrak: 
 function isAdmin() { return !!(S.me && S.me.admin); }
 /* SPV (akun Approval) dan Admin boleh MELIHAT daftar pekerjaan di semua icon Job Mekanik (termasuk pekerjaan tunda mekanik). Mengerjakan / meneruskan tetap butuh akses jenis pekerjaannya. */
 function canView(k) { return can(k) || isAdmin() || isApv(); }
+/* PKL (Jabatan berisi PKL, bukan Admin / Approval): hanya melihat ikon pekerjaan yang diberikan. Tanpa Dashboard, MDB, Part, Laporan, Reservasi, Master. Mulai kerja butuh ACC dulu. */
+function isPkl() { return !!(S.me && S.me.pkl && !S.me.admin && !S.me.apv); }
+var PKL_VIEWS = ['jobmek', 'jobpk', 'jobcs', 'nomo', 'ck', 'tb', 'pem', 'las', 'tbmenu', 'lc'];
+function canIzin() { return !!(S.me && (S.me.izin || S.me.apv)); }          /* boleh meng-ACC izin mulai kerja PKL: Group Head / Section Head (Approval) atau akses IZINPKL */
+function homeView() { return apHome() ? 'appr' : (isPkl() ? 'jobmek' : 'mon'); }
 function canViewKd(kd) { return canView(kd === 'tb' ? 'cat' : kd); }
 function viewOnlyKd(kd) { return canViewKd(kd) && !canKd(kd); }
 /* akses menu: 'rsv' = Reservasi, 'ls' = Laporan Service. Admin dan Approval otomatis; sesi lama (sebelum ada pengaturan ini) tetap terbuka sampai cek akun berikutnya */
@@ -1212,10 +1227,11 @@ function meUi() {
   if (a) a.textContent = S.me ? initial(S.me.nama) : '?';
   if (m) m.innerHTML = S.me ? '<span class="av">' + esc(initial(S.me.nama)) + '</span><div><b>' + esc(S.me.nama) + '</b><small>' + (S.me.nip ? 'NIP ' + esc(S.me.nip) + ' &middot; ' : '') + esc(S.me.lb || '') + '</small></div>' : '';
   if (ns) ns.style.display = isAdmin() ? '' : 'none';
-  var na = $('#nav_appr'); if (na) na.style.display = isApv() ? '' : 'none';
+  var na = $('#nav_appr'); if (na) na.style.display = isApv() || canIzin() ? '' : 'none';
   var nl = $('#nav_ls'); if (nl) nl.style.display = canMenu('ls') ? '' : 'none';
   var nr = $('#nav_rsv'); if (nr) nr.style.display = canMenu('rsv') ? '' : 'none';
   if (isApv() && S.ap.rows === null && !S.ap.busy && Date.now() - S.ap.last > 15000) setTimeout(function () { apFetch(); }, 0);
+  if (canIzin() && S.zp.rows === null && !S.zp.busy && Date.now() - S.zp.last > 15000) setTimeout(function () { izFetch(); }, 0);
   apBadge();
   if (S.me && S.data && canMenu('rsv') && S.rs.cand === null && !S.rs.busy && Date.now() - S.rs.last > 15000) setTimeout(function () { rsFetch(); }, 0);
   rsBadge();
@@ -1379,9 +1395,9 @@ function vPk() {
     '<div id="pkres"></div><div class="pklist" id="pk_list"></div><div id="pk_td">' + tdInner() + '</div></div>' + foot() + '</section>';
 }
 /* ---------- Job Mekanik > Corrective Supporting (CS) ----------
-   Pilih Pekerjaan (daftar gulir) -> nama petugas dan jabatan terisi otomatis -> Nomor Mobil diisi manual (Perawatan modul: Nomor Plat) -> Kerjakan -> tanya "Apakah Anda akan mengerjakan unit ini?" -> waktu mulai.
+   Pilih Pekerjaan (daftar gulir) -> nama petugas dan jabatan terisi otomatis -> Nomor Mobil diisi manual (Perawatan mojul: Nomor Plat) -> Kerjakan -> tanya "Apakah Anda akan mengerjakan unit ini?" -> waktu mulai.
    Keterangan wajib diisi dulu baru Pengerjaan Selesai. Tetap menunggu approval Group Head / Section Head. Tercatat di Laporan Jam Mekanik (jenis Corrective Supporting). */
-var CSJ = ['Perawatan modul', 'Persiapan unit scrap', 'Tambah ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop'];
+var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambah ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop'];
 function csModul() { return S.cs.p === CSJ[0]; }
 function csKey(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 /* isian Nomor Mobil / Nomor Plat -> mobil di Master kendaraan: { n, pl, jn } atau null */
@@ -1441,7 +1457,7 @@ function pkShowCs(el, job) {
   if (job.cf) body = pkCfHtml(job);
   else if (done) body = '<div class="pkx ro"><span>Keterangan</span><p>' + esc(job.t || '-') + '</p></div><div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
     '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' + (job.ap ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>');
-  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="Isi manual, contoh: Modul diganti dan sudah dites normal">' + esc(job.t || '') + '</textarea></div>' +
+  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="Isi manual, contoh: Mojul diganti dan sudah dites normal">' + esc(job.t || '') + '</textarea></div>' +
     '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + (csKet(job) ? '' : ' disabled') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
     '<div class="pkfs-hint" id="pk_csh"' + (csKet(job) ? ' style="display:none"' : '') + '>Isi Keterangan dulu (wajib). Tombol Pengerjaan Selesai aktif setelah Keterangan terisi.</div>';
   el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(job.n) + '</b><span class="pill pk-cs">Corrective Supporting</span></div><dl class="kv">' + rows + '</dl>' + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
@@ -2041,14 +2057,63 @@ function ckPick(kd, r) {
 function askStart(o, fn) {
   var cur = S.pk.job;
   if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
-  S.pkgo = fn;
+  S.pkgo = fn; S.pkgoO = o;
+  var pk = isPkl();
   showModal('<div class="sh-head"><b>' + (o.td ? 'Lanjutkan Pekerjaan Tunda' : 'Mulai Pengerjaan') + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(o.n) + '</b> <span class="pill pk-' + o.k + '">' + esc(o.t) + '</span>' +
     '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(meNama()) + '</dd>' + (o.info || '') + '</dl></div>' +
     '<div class="pkq">' + (o.td ? 'Apakah Anda akan meneruskan pekerjaan tunda ini?' : (o.q || 'Apakah Anda akan mengerjakan armada ini?')) +
-    '<small>' + (o.td ? 'Jam kerja Anda mulai dari nol setelah menekan OK.' : 'Waktu mulai berjalan setelah Anda menekan OK.') + '</small></div>' +
-    '<div class="pkyn"><button class="btn ghost" data-act="closemodal">Batal</button><button class="btn pkdone" id="pk_go" data-act="pkgoyes">' + ic('check') + ' OK, Mulai</button></div>');
+    '<small>' + (pk ? 'Anda perlu ACC dari Section Head / Group Head atau Devi dulu. Waktu mulai berjalan setelah disetujui.' : o.td ? 'Jam kerja Anda mulai dari nol setelah menekan OK.' : 'Waktu mulai berjalan setelah Anda menekan OK.') + '</small></div>' +
+    '<div class="pkyn"><button class="btn ghost" data-act="closemodal">Batal</button><button class="btn pkdone" id="pk_go" data-act="pkgoyes">' + ic(pk ? 'shield' : 'check') + (pk ? ' Minta ACC' : ' OK, Mulai') + '</button></div>');
   setTimeout(function () { var b = $('#pk_go'); if (b) b.focus(); }, 60);
+}
+/* ---------- Izin mulai kerja PKL (sisi PKL): tekan Kerjakan -> minta ACC -> layar menunggu -> setelah disetujui pekerjaan baru dimulai (waktu mulai = saat disetujui) ---------- */
+function izGate(o, fn) {
+  izStop(false);
+  var Z = S.iz = { o: o, fn: fn, id: '', st: 'kirim', by: '', al: '', err: '', tm: 0, busy: 0 };
+  izUi();
+  gs('izinMinta', [{ u: meNip(), j: o.k, n: o.n, k: o.key || '', info: o.iz || '' }]).then(function (r) {
+    if (S.iz !== Z) return;
+    if (!r || !r.ok) { Z.st = 'gagal'; Z.err = 'Permintaan gagal dikirim.'; izUi(); return; }
+    if (!r.perlu) { izRun(Z); return; }
+    Z.id = r.id; Z.st = r.st; Z.by = r.by || '';
+    if (r.st === 'Disetujui') { izRun(Z); return; }
+    izUi(); Z.tm = setInterval(function () { izTick(Z); }, window.BKA_IZ_WAIT_MS || 3000);
+  }, function (er) { if (S.iz !== Z) return; Z.st = 'gagal'; Z.err = msg(er); izUi(); });
+}
+function izTick(Z) {
+  if (S.iz !== Z) { clearInterval(Z.tm); return; }
+  if (!$('#iz_box')) { izStop(true); return; }          /* layar tunggu ditutup tanpa tombol: permintaan dibatalkan */
+  if (Z.busy) return;
+  Z.busy = 1;
+  gs('izinCek', [meNip(), Z.id]).then(function (r) {
+    Z.busy = 0; if (S.iz !== Z) return;
+    var st = r && r.st;
+    if (st === 'Disetujui') { Z.by = r.by || ''; izRun(Z); }
+    else if (st && st !== 'Menunggu') { clearInterval(Z.tm); Z.st = st === 'Dipakai' || st === 'Tidak ada' ? 'Kedaluwarsa' : st; Z.by = r.by || ''; Z.al = r.al || ''; izUi(); }
+  }, function () { Z.busy = 0; });
+}
+function izRun(Z) {
+  clearInterval(Z.tm); var fn = Z.fn; S.iz = null; closeModal();
+  toast('Disetujui' + (Z.by ? ' oleh ' + Z.by : '') + '. Selamat bekerja.');
+  if (fn) fn();
+}
+function izStop(batal) {
+  var Z = S.iz; if (!Z) return;
+  clearInterval(Z.tm); S.iz = null;
+  if (batal && Z.id && Z.st === 'Menunggu') gs('izinBatal', [meNip(), Z.id]).then(function () {}, function () {});
+  closeModal();
+}
+function izUi() {
+  var Z = S.iz; if (!Z) return;
+  var o = Z.o || {}, sum = '<div class="pkapsum"><b class="no">#' + esc(o.n || '') + '</b> <span class="pill pk-' + esc(o.k || '') + '">' + esc(o.t || '') + '</span></div>', h;
+  if (Z.st === 'kirim') h = '<div class="iz-box" id="iz_box"><div class="loading"><div class="spinner"></div></div><b>Mengirim permintaan...</b></div>';
+  else if (Z.st === 'Menunggu') h = sum + '<div class="iz-box" id="iz_box"><div class="iz-ic">' + ic('clock') + '</div><b>Menunggu ACC</b><small>Permintaan sudah dikirim ke Section Head / Group Head dan Devi. Layar ini lanjut sendiri setelah disetujui. Waktu kerja belum berjalan.</small>' +
+    '<button class="btn ghost full" data-act="izbatal">Batalkan permintaan</button></div>';
+  else if (Z.st === 'Ditolak') h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('x') + '</div><b>Ditolak</b><small>' + esc(Z.by ? 'Oleh ' + Z.by + '. ' : '') + esc(Z.al || 'Hubungi Section Head / Group Head atau Devi.') + '</small><button class="btn full" data-act="izclose">Tutup</button></div>';
+  else if (Z.st === 'gagal') h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('warn') + '</div><b>Belum bisa meminta ACC</b><small>' + esc(Z.err || 'Periksa sinyal, lalu coba lagi.') + '</small><button class="btn full" data-act="izclose">Tutup</button></div>';
+  else h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('clock') + '</div><b>Permintaan berakhir</b><small>Tekan Kerjakan lagi untuk meminta ACC baru.</small><button class="btn full" data-act="izclose">Tutup</button></div>';
+  showModal('<div class="sh-head"><b>Izin Mulai Kerja</b></div>' + h);
 }
 /* Cat > Kerjakan pertama kali: tanya dulu apakah armada langsung dikerjakan atau di Las / Ketok dahulu. Sesudah Las selesai pertanyaan ini tidak muncul lagi. */
 function ckStart(kd, r, n, lf, td) {
@@ -2067,7 +2132,7 @@ function askCatLas(r, n) {
 }
 function ckStartGo(kd, r, n, lf, td) {
   var info = '<dt>' + (kdTb(kd) ? 'Detail' : 'Keluhan') + '</dt><dd>' + esc(String(r.kl || '-').slice(0, 120)) + '</dd>' + (kdTb(kd) && r.rg ? '<dt>No Registrasi</dt><dd>' + esc(r.rg) + '</dd>' : '');
-  askStart({ n: n, k: kd, t: KDC[kd].t, info: info, td: !!td }, function () { ckBegin(kd, r, n, lf, td); });
+  askStart({ n: n, k: kd, t: KDC[kd].t, info: info, td: !!td, key: r.k || '', iz: String(r.kl || '').slice(0, 100) }, function () { ckBegin(kd, r, n, lf, td); });
 }
 function ckBegin(kd, r, n, lf, td) {
   var cur = S.pk.job;
@@ -3022,13 +3087,20 @@ var APJ = { teknik: 'Service Teknik', ki: 'Service Keindahan', ck: 'Corrective (
 function apLbl(it) { return it.j === 'teknik' || it.j === 'ki' ? 'Pekerjaan Tambahan' : (it.j === 'cs' ? 'Pekerjaan' : (it.j === 'las' ? 'Keterangan' : 'Tindakan')); }
 function apTx(it) { return it.j === 'teknik' || it.j === 'ki' || it.j === 'cs' ? it.pt : it.dt; }
 function isApv() { return !!(S.me && S.me.apv); }
-function apHome() { return isApv() && !Object.keys((S.me && S.me.jobs) || {}).length; }      /* akun Approval murni: langsung ke halaman Approval */
+function apHome() { return (isApv() || canIzin()) && !Object.keys((S.me && S.me.jobs) || {}).length; }      /* akun Approval murni: langsung ke halaman Approval */
 function apMine(it) { return !!it.nip && String(it.nip).toLowerCase() === String(meNip()).toLowerCase(); }
 function apFind(id) { var r = S.ap.rows || [], i; for (i = 0; i < r.length; i++) if (r[i].id === id) return r[i]; return null; }
+function apN() { return (isApv() && S.ap.rows ? S.ap.rows.length : 0) + (canIzin() && S.zp.rows ? S.zp.rows.length : 0); }
+function apDt() {
+  var a = isApv() ? S.ap.rows : [], z = canIzin() ? S.zp.rows : [], na = a ? a.length : 0, nz = z ? z.length : 0;
+  if ((isApv() && !a) || (canIzin() && !z)) return 'Memuat...';
+  if (!na && !nz) return 'Tidak ada yang menunggu';
+  return (na ? na + ' pekerjaan menunggu persetujuan Anda' : '') + (na && nz ? ' &middot; ' : '') + (nz ? nz + ' izin mulai kerja PKL' : '');
+}
 function apBadge() {
-  var n = S.ap.rows ? S.ap.rows.length : 0, b = $('#apbadge'), t = $('#apdt');
+  var n = apN(), b = $('#apbadge'), t = $('#apdt');
   if (b) { b.textContent = n > 99 ? '99+' : String(n); b.style.display = n ? '' : 'none'; }
-  if (t) t.textContent = !S.ap.rows ? 'Memuat...' : n ? n + ' pekerjaan menunggu persetujuan Anda' : 'Tidak ada pekerjaan yang menunggu';
+  if (t) t.innerHTML = apDt();
 }
 function apFetch(force) {
   var A = S.ap; if (!isApv() || A.busy || !S.me) return Promise.resolve();
@@ -3064,8 +3136,11 @@ function apDoneCard(it) {
     '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Disetujui ' + esc(it.pw || '-') + ' &middot; ' + hm(it.at) + ' &middot; ' + pkDmy(it.at) + '</span></div></div>';
 }
 function vAppr() {
-  var A = S.ap, rows = A.rows, wait = A.tab !== 'done', body;
-  var tabs = '<div class="ls-mode ap-tabs"><button class="' + (wait ? 'on' : '') + '" data-act="aptab" data-a="wait">Menunggu' + (rows ? ' (' + rows.length + ')' : '') + '</button><button class="' + (wait ? '' : 'on') + '" data-act="aptab" data-a="done">Sudah disetujui' + (rows ? ' (' + A.done.length + ')' : '') + '</button></div>';
+  var A = S.ap, rows = A.rows, tab = !isApv() ? 'izin' : (A.tab === 'done' ? 'done' : (A.tab === 'izin' && canIzin() ? 'izin' : 'wait')), wait = tab === 'wait', body;
+  var zn = S.zp.rows ? S.zp.rows.length : 0;
+  var tabs = isApv() ? '<div class="ls-mode ap-tabs t3"><button class="' + (wait ? 'on' : '') + '" data-act="aptab" data-a="wait">Menunggu' + (rows ? ' (' + rows.length + ')' : '') + '</button><button class="' + (tab === 'izin' ? 'on' : '') + '" data-act="aptab" data-a="izin">Izin PKL' + (S.zp.rows ? ' (' + zn + ')' : '') + '</button><button class="' + (tab === 'done' ? 'on' : '') + '" data-act="aptab" data-a="done">Selesai' + (rows ? ' (' + A.done.length + ')' : '') + '</button></div>' : '';
+  if (tab === 'izin') return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (isApv() ? 'Approval' : 'Izin PKL') + '</h2></div>' +
+    '<section class="pad">' + errBanner() + '<div class="ap-note">' + ic('shield') + '<div>PKL minta izin sebelum mulai mengerjakan. Setujui bila boleh mulai; waktu kerja PKL baru berjalan setelah Anda setujui.</div></div>' + tabs + izBody() + foot() + '</section>';
   if (A.err && !rows) body = '<div class="empty">Gagal memuat daftar approval.<br><small>' + esc(A.err) + '</small></div>';
   else if (!rows) body = '<div class="empty">Memuat daftar approval...</div>';
   else if (wait) body = rows.length ? '<div class="ap-list">' + rows.map(apCard).join('') + '</div>' : '<div class="empty ap-empty">' + ic('check') + '<b>Semua sudah disetujui</b>Tidak ada pekerjaan yang menunggu approval.</div>';
@@ -3074,6 +3149,51 @@ function vAppr() {
     '<section class="pad">' + errBanner() + '<div class="ap-note">' + ic('shield') + '<div>Pekerjaan yang sudah selesai menunggu persetujuan Anda' + (S.me && S.me.jabatan ? ' sebagai <b>' + esc(S.me.jabatan) + '</b>' : '') + '. Akun ini hanya melihat dan menyetujui, tidak mengerjakan pekerjaan. Mekanik menunggu hasil approval Anda.</div></div>' +
     tabs + body + foot() + '</section>';
 }
+/* ---------- Izin mulai kerja PKL: sisi penyetuju (Group Head / Section Head / akses IZINPKL) ---------- */
+function izFetch(force) {
+  var Z = S.zp; if (!canIzin() || Z.busy || !S.me) return Promise.resolve();
+  Z.busy = true; Z.last = Date.now();
+  return gs('getIzin', [meNip(), force ? '' : Z.h]).then(function (r) {
+    Z.busy = false; Z.err = '';
+    if (r && r.rows) { Z.rows = r.rows; Z.done = r.done || []; Z.h = r.h || ''; apBadge(); if (S.view === 'appr') rerender(); }
+  }, function (er) { Z.busy = false; Z.err = msg(er); if (S.view === 'appr' && !Z.rows) rerender(); });
+}
+setInterval(function () { if (!document.hidden && canIzin() && S.data) izFetch(); }, window.BKA_IZ_POLL_MS || 6000);
+function izAgo(it) {
+  var m = Math.floor((Date.now() - (it.t || 0)) / 60000);
+  return !it.t ? '' : m < 1 ? 'baru saja' : m < 60 ? m + ' menit lalu' : Math.floor(m / 60) + ' jam lalu';
+}
+function izCard(it) {
+  return '<div class="ap-card iz" data-id="' + esc(it.id) + '"><div class="ap-c1">' + nchip(it.n) + '<span class="pill pk-' + esc(it.j) + '">' + esc(APJ[it.j] || it.j) + '</span><span class="ap-ago">' + esc(izAgo(it)) + '</span></div>' +
+    '<div class="ap-c2"><b>' + esc(it.nm) + '</b><span>' + esc(it.jb || 'PKL') + '</span></div>' +
+    (it.kt ? '<div class="ap-tx"><small>Pekerjaan</small>' + esc(it.kt) + '</div>' : '') +
+    '<div class="ap-st bad">' + ic('clock', 'sm') + '<span>Menunggu ACC untuk mulai mengerjakan</span></div>' +
+    '<div class="ap-bts two"><button class="btn ghost ap-bt ap-no" data-act="iztolak" data-a="' + esc(it.id) + '">' + ic('x', 'sm') + ' Tolak</button><button class="btn pkdone ap-bt" data-act="izok" data-a="' + esc(it.id) + '">' + ic('shield', 'sm') + ' ACC, boleh mulai</button></div></div>';
+}
+function izDoneCard(it) {
+  var ok = it.st !== 'Ditolak';
+  return '<div class="ap-card done"><div class="ap-c1">' + nchip(it.n) + '<span class="pill pk-' + esc(it.j) + '">' + esc(APJ[it.j] || it.j) + '</span></div>' +
+    '<div class="ap-c2"><b>' + esc(it.nm) + '</b><span>' + esc(it.jb || 'PKL') + '</span></div>' +
+    '<div class="ap-st ' + (ok ? 'ok' : 'bad') + '">' + ic(ok ? 'shield' : 'x', 'sm') + '<span>' + (ok ? 'Di-ACC ' : 'Ditolak ') + esc(it.by || '-') + (it.at ? ' &middot; ' + hm(it.at) + ' &middot; ' + pkDmy(it.at) : '') + (it.st === 'Dipakai' ? ' &middot; sudah mulai' : '') + '</span></div></div>';
+}
+function izBody() {
+  var Z = S.zp, rows = Z.rows;
+  if (Z.err && !rows) return '<div class="empty">Gagal memuat daftar izin.<br><small>' + esc(Z.err) + '</small></div>';
+  if (!rows) return '<div class="empty">Memuat daftar izin...</div>';
+  return (rows.length ? '<div class="ap-list">' + rows.map(izCard).join('') + '</div>' : '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang menunggu</b>Permintaan izin PKL muncul di sini.</div>') +
+    (Z.done.length ? '<h3 style="margin:18px 2px 8px;font-size:14px;color:var(--muted)">Sudah diputuskan (2 hari)</h3><div class="ap-list">' + Z.done.map(izDoneCard).join('') + '</div>' : '');
+}
+function izDecide(id, ok) {
+  var Z = S.zp, it = (Z.rows || []).filter(function (x) { return x.id === id; })[0]; if (!it || Z.saving) return;
+  Z.saving = 1;
+  gs('izinSet', [{ u: meNip(), id: id, ok: ok }]).then(function (r) {
+    Z.saving = 0;
+    if (r && r.already) toast('Sudah diputuskan: ' + (r.st || '') + (r.by ? ' oleh ' + r.by : ''));
+    else toast(ok ? 'ACC: ' + it.nm + ' boleh mulai mengerjakan #' + it.n : 'Izin ' + it.nm + ' ditolak');
+    izFetch(true);
+  }, function (er) { Z.saving = 0; toast(msg(er), true); izFetch(true); });
+}
+
 function apPhGrid(slots, las) {
   return '<div class="lf-phs">' + (las ? PHL : PHS).map(function (sl) {
     var f = slots.filter(function (x) { return x.k === sl[0]; })[0];
@@ -3382,11 +3502,15 @@ var ACT = {
     var C = S.cs, f = csFind();
     if (!C.p) { toast('Pilih pekerjaan dulu.', true); return; }
     if (!f) { toast((csModul() ? 'Nomor plat' : 'No Mobil') + ' belum benar / tidak ada di Master kendaraan.', true); return; }
-    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', q: 'Apakah Anda akan mengerjakan unit ini?',
+    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p, q: 'Apakah Anda akan mengerjakan unit ini?',
       info: '<dt>Pekerjaan</dt><dd>' + esc(C.p) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' + (f.jn ? '<dt>Jenis</dt><dd>' + esc(f.jn) + '</dd>' : '') + (f.pl ? '<dt>Nomor Plat</dt><dd>' + esc(f.pl) + '</dd>' : '') },
       function () { csBegin(f); });
   },
-  pkgoyes: function () { var f = S.pkgo; S.pkgo = null; closeModal(); if (f) f(); },
+  pkgoyes: function () { var f = S.pkgo, o = S.pkgoO; S.pkgo = null; closeModal(); if (!f) return; if (isPkl()) izGate(o || {}, f); else f(); },
+  izok: function (a) { izDecide(a, true); },
+  iztolak: function (a) { izDecide(a, false); },
+  izbatal: function () { izStop(true); },
+  izclose: function () { izStop(false); },
   pkgo: function (a, b) {
     var jn = a === 'ki' ? 'ki' : 'teknik', n = pkNum(b);
     if (!can(jn)) { toast('Akun Anda tidak punya akses ke ' + PKJ[jn] + '.', true); return; }
@@ -3490,7 +3614,7 @@ var ACT = {
     j.pem = a === '1' ? 1 : 0; j.t = 'Foto selesai (' + fs.length + ' foto)'; j.e = Date.now(); j.ap = null;
     pkJobSave(); closeModal(); pkShow(); pkSync(); toast(j.pem ? 'Cat selesai. Armada masuk ke daftar PEM.' : 'Pengerjaan selesai, waktu berhenti');
   },
-  aptab: function (a) { S.ap.tab = a === 'done' ? 'done' : 'wait'; rerender(); },
+  aptab: function (a) { S.ap.tab = a === 'done' ? 'done' : (a === 'izin' ? 'izin' : 'wait'); rerender(); },
   apok: function (a) {
     var it = apFind(a); if (!it) return;
     if (apMine(it)) { toast('Anda tidak bisa menyetujui pekerjaan Anda sendiri.', true); return; }
@@ -3789,7 +3913,7 @@ var ACT = {
       S.loginBusy = false;
       if (r && r.ok && r.u) {
         S.loginNip = ''; S.td = { rows: [], ssel: [], sel: [], loc: [], h: '', busy: false, err: '' }; S.users.rows = null; S.users.h = '';
-        S.ap.rows = null; S.ap.h = ''; rsReset(); meSet(r.u); S.view = 'mon'; renderShell(); monFetch(); toast('Masuk sebagai ' + r.u.nama); if (apHome()) go('appr');
+        S.ap.rows = null; S.ap.h = ''; rsReset(); meSet(r.u); S.view = 'mon'; S.iz = null; renderShell(); monFetch(); toast('Masuk sebagai ' + r.u.nama); if (homeView() !== 'mon') go(homeView());
       } else { S.loginErr = (r && r.err) || 'NIP tidak dikenal.'; rerender(); }
     }, function (er) { S.loginBusy = false; S.loginErr = 'Gagal tersambung ke server: ' + msg(er); rerender(); });
   },
@@ -3810,6 +3934,7 @@ var ACT = {
       else o[mk] = !o[mk];
       usAkUi(); return;
     }
+    if (a === 'IZINPKL') { if (o.apv) { toast('Akses Approval sudah termasuk meng-ACC izin PKL.'); return; } o.izin = !o.izin; usAkUi(); return; }
     if (a === 'APPROVAL') o.apv = !o.apv;
     else if (a === 'ADMIN') o.admin = !o.admin;
     else if (a === 'SEMUA') { var was = !o.admin && akAll(o); o.admin = false; AK_JOBS.forEach(function (x) { if (was) delete o.set[x[0]]; else o.set[x[0]] = 1; }); }
@@ -3926,7 +4051,7 @@ S.jam.d = todayIso(); S.jam.rm = S.jam.d.slice(0, 7);
   if (ch) pkJobSave();
 })();
 meUi();
-go(apHome() ? 'appr' : 'mon');
+go(homeView());
 var cached = cacheLoad();
 if (cached && cached.master) { S.data = cached; derive(); renderShell(); }
 meCheck();
