@@ -1,10 +1,10 @@
-/* Service worker - Bengkel & Armada Monitoring (build 2ada4e98fd).
+/* Service worker - Bengkel & Armada Monitoring (build f1bdd4bd73).
    - File aplikasi disimpan di perangkat: aplikasi tetap terbuka walau sinyal jelek / tanpa internet.
    - index.html, config.js, pwa.js: ambil dari jaringan dulu (selalu versi terbaru), cadangan dari simpanan.
    - app.js?v=...: berversi, jadi cukup diambil dari simpanan (hemat kuota).
    - Panggilan ke server Apps Script (alamat lain) TIDAK disentuh. */
-var CACHE = 'bka-2ada4e98fd';
-var SHELL = ['./', 'index.html', 'config.js', 'pwa.js', 'app.js?v=2ada4e98fd', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+var CACHE = 'bka-f1bdd4bd73';
+var SHELL = ['./', 'index.html', 'config.js', 'pwa.js', 'app.js?v=f1bdd4bd73', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 var FRESH = /\/(index\.html|config\.js|pwa\.js)$/;
 
 self.addEventListener('install', function (e) {

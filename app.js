@@ -203,7 +203,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-02 15:58';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-02 16:25';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -468,7 +468,7 @@ function lcAsk(w, i, id) {
   var L = S.lc;
   if (w === 's') { var sj = S.pk.job; if (!sj || !sj.ck || sj.e || fsf(sj).busy) return; }
   else if (w === 'b' ? L.busyS : (!L.af || L.af.busy)) return;
-  L.tgt = { w: w, i: +i }; var el = $('#' + id); if (el) { el.value = ''; el.click(); }
+  L.tgt = { w: w, i: +i }; var el = $('#' + id); if (el) { el.value = ''; camGo(el); }
 }
 function lcPick(file) {
   var L = S.lc, t = L.tgt; L.tgt = null; if (!file || !t) return;
@@ -1836,8 +1836,49 @@ function pkPhUi() {
 function phAsk(k, id) {
   var j = S.pk.job; if (!phOn(j) || j.ap || j.td || j.cf) return;
   if (!phSlots(j).some(function (s) { return s[0] === k; })) return;
-  S.pk.phk = k; var el = $('#' + id); if (el) { el.value = ''; el.click(); }
+  S.pk.phk = k; var el = $('#' + id); if (el) { el.value = ''; camGo(el); }
 }
+/* ---------- kamera di dalam aplikasi ----------
+   Tombol Kamera membuka layar kamera (kamera belakang) dengan tombol bulat Ambil Foto: tanpa keluar ke aplikasi kamera / galeri HP, dan halaman tidak ikut dimuat ulang.
+   Bila browser tidak mengizinkan (izin ditolak, tidak ada kamera, atau dibuka di bingkai tanpa izin kamera) tampil tombol "Buka Kamera HP" yang memakai input kamera biasa (capture). */
+var CAM = { stream: null, face: 'environment', inp: null, run: 0 };
+function camNativeOk() { var md = navigator.mediaDevices; return !window.BKA_CAM_NATIVE && !!(md && md.getUserMedia) && window.isSecureContext !== false; }
+function camGo(inp) {
+  if (!inp) return;
+  if (!camNativeOk()) { inp.click(); return; }
+  CAM.inp = inp; CAM.face = 'environment'; camOpen();
+}
+function camStop() { if (CAM.stream) { try { CAM.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) { } CAM.stream = null; } }
+function camClose() { camStop(); CAM.run++; var o = $('#camov'); if (o) o.parentNode.removeChild(o); }
+function camOpen() {
+  var o = $('#camov');
+  if (!o) { o = document.createElement('div'); o.id = 'camov'; o.className = 'camov'; document.body.appendChild(o); }
+  o.innerHTML = '<video id="cam_v" playsinline muted autoplay></video><div class="cam-msg" id="cam_m">Membuka kamera...</div>' +
+    '<div class="cam-bar"><button type="button" class="cam-x" data-act="camclose">Batal</button><button type="button" class="cam-shot" id="cam_s" data-act="camshot" aria-label="Ambil foto" disabled></button><button type="button" class="cam-x" data-act="camflip">Putar</button></div>';
+  camStop(); var my = ++CAM.run;
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: CAM.face }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (st) {
+    if (my !== CAM.run || !$('#camov')) { st.getTracks().forEach(function (t) { t.stop(); }); return; }
+    CAM.stream = st; var v = $('#cam_v'); v.srcObject = st; var p = v.play && v.play(); if (p && p.catch) p.catch(function () { });
+    var m = $('#cam_m'); if (m) m.style.display = 'none'; var b = $('#cam_s'); if (b) b.disabled = false;
+  }, function (er) { if (my === CAM.run) camFail(er); });
+}
+function camFail(er) {
+  var n = (er && er.name) || '', t = /NotAllowed|Security/i.test(n) ? 'Izin kamera belum diberikan.' : (/NotFound|Overconstrained/i.test(n) ? 'Kamera tidak ditemukan.' : 'Kamera di dalam aplikasi tidak bisa dibuka.'), o = $('#camov');
+  if (!o) return;
+  o.innerHTML = '<div class="cam-fail"><p><b>' + t + '</b></p><p>Foto tetap bisa diambil dengan aplikasi kamera bawaan HP.</p><button type="button" class="btn full" data-act="camnative">Buka Kamera HP</button><button type="button" class="btn ghost full" data-act="camclose">Batal</button></div>';
+}
+function camShot() {
+  var v = $('#cam_v'); if (!v || !CAM.stream || !v.videoWidth) return;
+  var cv = document.createElement('canvas'), id = CAM.inp && CAM.inp.id; cv.width = v.videoWidth; cv.height = v.videoHeight;
+  cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+  cv.toBlob(function (b) {
+    camClose();
+    if (!b) { toast('Foto gagal diambil. Coba lagi.', true); return; }
+    var f; try { f = new File([b], 'kamera.jpg', { type: 'image/jpeg' }); } catch (e) { f = b; }
+    if (id === 'lc_cam') lcPick(f); else phPick(f);
+  }, 'image/jpeg', 0.92);
+}
+document.addEventListener('visibilitychange', function () { if (document.hidden && $('#camov')) camClose(); });
 /* kamera HP bisa menghasilkan jpeg/png/webp/heic -> terima semua gambar, lalu diubah ke JPEG; PDF dan file lain ditolak */
 function photoOk(f) { return /^image\//i.test(f.type || '') || (!f.type && /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name || '')); }
 /* foto -> JPEG maks 1280 px (cukup jelas, ukuran kecil supaya cepat terkirim) */
@@ -3980,6 +4021,10 @@ var ACT = {
   lcfo: function (a, b) { var r = null, R = S.lc.rows || [], i; for (i = 0; i < R.length; i++) if (R[i].k === a) r = R[i]; if (r) tbFotoOpen(r.fo || [], +b, 'Foto sebelum · ' + r.n, 'sebelum'); },
   lcfs: function (a, b) { var r = null, R = S.lc.rows || [], i; for (i = 0; i < R.length; i++) if (R[i].k === a) r = R[i]; if (r) tbFotoOpen(r.fs || [], +b, 'Foto sesudah · ' + r.n, 'sesudah'); },
   phcam: function (a) { phAsk(a, 'ph_cam'); },
+  camclose: function () { camClose(); },
+  camshot: function () { camShot(); },
+  camflip: function () { CAM.face = CAM.face === 'environment' ? 'user' : 'environment'; camOpen(); },
+  camnative: function () { var inp = CAM.inp; camClose(); if (inp) { inp.value = ''; inp.click(); } },
   phfile: function (a) { phAsk(a, 'ph_file'); },
   ckday: function (a, b) { var kd = kdArg(b), C = S[kd], nd = isoAdd(C.d, +a); if (nd > todayIso()) return; if (kd === 'tb') tbRegReset(); C.d = nd; renderShell(); ckFetch(kd, nd); },
   cktoday: function (a, b) { var kd = kdArg(b); if (kd === 'tb') tbRegReset(); S[kd].d = todayIso(); renderShell(); ckFetch(kd, S[kd].d); },
