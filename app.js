@@ -136,12 +136,13 @@ function go(v) {
   if ((v === 'lapsvc' || v === 'lapfokus') && !canMenu('ls')) { toast('Akun Anda tidak punya akses ke menu Laporan Service.', true); return; }
   if ((v === 'rsv' || v === 'rsvform') && !canMenu('rsv')) { toast('Akun Anda tidak punya akses ke menu Reservasi.', true); return; }
   if (v === 'appr' || v === 'lapsvc') S.ls.from = '';
-  if (v === 'ck' && !can('ck')) { toast('Akun Anda tidak punya akses ke Corrective Kendaraan (CK).', true); return; }
-  if (v === 'tbmenu' && !can('tb')) { toast('Akun Anda tidak punya akses ke Tabrak (Cat, Las, PEM).', true); return; }
-  if ((v === 'tb' || v === 'lc') && !can('cat')) { toast('Akun Anda tidak punya akses ke Tabrak Cat.', true); return; }
-  if (v === 'las' && !can('las')) { toast('Akun Anda tidak punya akses ke Tabrak Las.', true); return; }
-  if (v === 'pem' && !can('pem')) { toast('Akun Anda tidak punya akses ke Tabrak PEM.', true); return; }
-  if (v === 'jobpk' && !S.pk.job && !can('teknik') && !can('ki')) { toast('Akun Anda tidak punya akses ke Preventive Kendaraan.', true); return; }
+  if (v === 'ck' && !canView('ck')) { toast('Akun Anda tidak punya akses ke Corrective Kendaraan (CK).', true); return; }
+  if (v === 'tbmenu' && !canView('tb')) { toast('Akun Anda tidak punya akses ke Tabrak (Cat, Las, PEM).', true); return; }
+  if (v === 'tb' && !canView('cat')) { toast('Akun Anda tidak punya akses ke Tabrak Cat.', true); return; }
+  if (v === 'lc' && !can('cat')) { toast('Akun Anda tidak punya akses ke Tabrak Cat.', true); return; }
+  if (v === 'las' && !canView('las')) { toast('Akun Anda tidak punya akses ke Tabrak Las.', true); return; }
+  if (v === 'pem' && !canView('pem')) { toast('Akun Anda tidak punya akses ke Tabrak PEM.', true); return; }
+  if (v === 'jobpk' && !S.pk.job && !canView('teknik') && !canView('ki')) { toast('Akun Anda tidak punya akses ke Preventive Kendaraan.', true); return; }
   if (v === 'rsvform' && !S.rs.f) v = 'rsv';
   if (v === 'jam' && S.view.indexOf('jam') !== 0) S.jam.d = todayIso();
   if ((v === 'jamharian' || v === 'jambulan') && S.view === 'jam') S.jam.rm = S.jam.d.slice(0, 7);
@@ -287,9 +288,9 @@ function vSvc(v) {
 }
 
 var JOBS = [
-  { k: 'PK', t: 'Preventive Kendaraan', cls: 'j-pk', img: 'pk', go: 'jobpk', acc: function () { return can('teknik') || can('ki'); } },
-  { k: 'CK', t: 'Corrective Kendaraan', cls: 'j-ck', img: 'ck', go: 'ck', acc: function () { return can('ck'); } },
-  { k: 'TB', t: 'Tabrak',               cls: 'j-tb', img: 'tb', go: 'tbmenu', acc: function () { return can('tb'); } },
+  { k: 'PK', t: 'Preventive Kendaraan', cls: 'j-pk', img: 'pk', go: 'jobpk', acc: function () { return canView('teknik') || canView('ki'); }, vo: function () { return !can('teknik') && !can('ki'); } },
+  { k: 'CK', t: 'Corrective Kendaraan', cls: 'j-ck', img: 'ck', go: 'ck', acc: function () { return canView('ck'); }, vo: function () { return !can('ck'); } },
+  { k: 'TB', t: 'Tabrak',               cls: 'j-tb', img: 'tb', go: 'tbmenu', acc: function () { return canView('tb'); }, vo: function () { return !can('tb'); } },
   { k: 'CS', t: 'Corrective Supporting', cls: 'j-cs', img: 'cs', acc: function () { return can('cs'); } },
   { k: 'PS', t: 'Preventive Supporting', cls: 'j-ps', img: 'ps', acc: function () { return can('ps'); } }
 ];
@@ -298,7 +299,7 @@ function vJob() {
     '<section class="pad">' + errBanner() + '<div class="jobs">' + JOBS.map(function (j) {
       var okj = j.acc ? j.acc() : true;
       return '<button class="jcard ' + j.cls + (okj ? '' : ' lock') + '" ' + (okj ? 'data-go="' + (j.go || 'soon:' + esc(j.t)) + '"' : 'data-act="nojob" data-a="' + esc(j.t) + '"') + ' aria-label="' + esc(j.t) + '"><img class="jimg" src="' + JOB_IMG[j.img] + '" alt="">' +
-        (okj ? '' : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + '<span class="jbadge">' + j.k + '</span><span class="jt">' + j.t.replace(' ', '<br>') + '</span></button>';
+        (okj ? (j.vo && j.vo() ? '<span class="jlk vo">' + ic('search') + 'Hanya lihat</span>' : '') : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + '<span class="jbadge">' + j.k + '</span><span class="jt">' + j.t.replace(' ', '<br>') + '</span></button>';
     }).join('') + '</div></section>';
 }
 
@@ -313,8 +314,8 @@ function vTbMenu() {
   var L = [{ k: 'cat', t: 'Cat', go: 'tb' }, { k: 'las', t: 'Las', go: 'las' }, { k: 'pem', t: 'PEM', go: 'pem' }, { k: 'lc', t: 'LC', go: 'lc' }];
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Tabrak</h2></div>' +
     '<section class="pad">' + errBanner() + '<div class="jobs">' + L.map(function (x) {
-      var okx = can(x.k === 'lc' ? 'cat' : x.k), nm = x.k === 'lc' ? 'LC (Tabrak Cat)' : 'Tabrak ' + x.t;
-      return '<button class="jcard j-' + x.k + (okx ? '' : ' lock') + '" ' + (okx ? 'data-go="' + x.go + '"' : 'data-act="nojob" data-a="' + nm + '"') + ' aria-label="' + x.t + '">' + (okx ? '' : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + (x.soon ? '<span class="jsoon">Segera hadir</span>' : '') +
+      var okx = x.k === 'lc' ? can('cat') : canView(x.k), vox = okx && x.k !== 'lc' && !can(x.k), nm = x.k === 'lc' ? 'LC (Tabrak Cat)' : 'Tabrak ' + x.t;
+      return '<button class="jcard j-' + x.k + (okx ? '' : ' lock') + '" ' + (okx ? 'data-go="' + x.go + '"' : 'data-act="nojob" data-a="' + nm + '"') + ' aria-label="' + x.t + '">' + (okx ? (vox ? '<span class="jlk vo">' + ic('search') + 'Hanya lihat</span>' : '') : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + (x.soon ? '<span class="jsoon">Segera hadir</span>' : '') +
         (x.k === 'cat' ? '<span class="jico pic"><img src="' + CAT_IMG + '" alt=""></span>' : '<span class="jico">' + TBSVG[x.k] + '</span>') + '<span class="jt big">' + x.t + '</span></button>';
     }).join('') + '</div></section>';
 }
@@ -725,7 +726,7 @@ function monModel() {
   function u(n) { if (!U[n]) { U[n] = { n: n, w: 0, run: 0, qc: 0, ok: 0, tn: 0, q: [] }; order.push(n); } return U[n]; }
   jobs.forEach(function (r) {
     var x = u(r.n); x.w++;
-    if (!r.e) x.run++; else if (r.st === 'Tunda') x.tn++; else if (r.ap === 'Disetujui') x.ok++; else x.qc++;
+    if (!r.e) x.run++; else if (r.st === 'Tunda') x.tn++; else if (r.ap === 'Disetujui' || r.ap === 'Lama') x.ok++; else x.qc++;          /* 'Lama' = approval sebelum tanggal mulai approval baru: dianggap selesai, tidak masuk QC */
   });
   q.forEach(function (r) { u(r.n).q.push(r); });
   var c = { masuk: 0, run: 0, qc: 0, ant: 0, ok: 0 }, ok = [], ant = [];      /* masuk = mobil yang sedang / sudah dikerjakan mekanik hari ini (bukan jumlah laporan / antrian) */
@@ -742,6 +743,7 @@ function monModel() {
     var n = '<b>' + esc(r.n) + '</b>', t, tx, w;
     if (!r.e) { t = tmin(r.s); tx = n + ' sedang dikerjakan ' + esc(r.nm) + ' (' + esc(monJenis(r)) + ') sejak ' + esc(r.s); }
     else if (r.st === 'Tunda') { t = tmin(r.e); tx = n + ' ditunda ' + esc(r.nm) + ' (' + esc(monJenis(r)) + ')' + (r.tc ? ': ' + esc(r.tc) : ''); }
+    else if (r.ap === 'Lama') { t = tmin(r.e); tx = n + ' sudah selesai'; }
     else if (r.ap === 'Disetujui') { w = monWa(r.wa); t = w ? w.min : tmin(r.e); tx = n + ' lolos Pengecekan oleh ' + esc(r.pw || 'pengawas') + (w ? ' pukul ' + w.hm : ''); }
     else { t = tmin(r.e); tx = n + ' sudah selesai, sedang dilakukan Pengecekan oleh pengawas (GH / SH)'; }
     ev.push({ t: t == null ? -1 : t, h: tx, x: r.e || r.s || '' });
@@ -766,7 +768,7 @@ function monBody() {
       '<span class="mn-st ' + (run ? 'mn-o' : (tn ? 'mn-v' : 'mn-g')) + '">' + (run ? 'Sedang dikerjakan' : (tn ? 'Ditunda' : 'Selesai')) + '</span>',
       run ? '-' : esc(r.e), run ? '-' : esc(monDur(r.m))]);
   });
-  var qcs = jobs.filter(function (r) { return r.e && r.st !== 'Tunda'; }).sort(function (a, b) { return (tmin(a.e) || 0) - (tmin(b.e) || 0); }).map(function (r, i) {
+  var qcs = jobs.filter(function (r) { return r.e && r.st !== 'Tunda' && r.ap !== 'Lama'; }).sort(function (a, b) { return (tmin(a.e) || 0) - (tmin(b.e) || 0); }).map(function (r, i) {
     var ok = r.ap === 'Disetujui', w = ok ? monWa(r.wa) : null;
     return monRow([i + 1, '<span class="mn-car">' + esc(r.n) + '</span><small>' + esc(monJenis(r)) + '</small>', esc(r.e),
       '<span class="mn-st ' + (ok ? 'mn-g' : 'mn-o') + '">' + (ok ? 'Sudah selesai' : 'Pengecekan') + '</span>',
@@ -1192,6 +1194,10 @@ function can(k) {
 }
 function canKd(kd) { return can(kd === 'tb' ? 'cat' : kd); }      /* kd Tabrak: 'tb' = Cat, 'pem', 'las' */
 function isAdmin() { return !!(S.me && S.me.admin); }
+/* SPV (akun Approval) dan Admin boleh MELIHAT daftar pekerjaan di semua icon Job Mekanik (termasuk pekerjaan tunda mekanik). Mengerjakan / meneruskan tetap butuh akses jenis pekerjaannya. */
+function canView(k) { return can(k) || isAdmin() || isApv(); }
+function canViewKd(kd) { return canView(kd === 'tb' ? 'cat' : kd); }
+function viewOnlyKd(kd) { return canViewKd(kd) && !canKd(kd); }
 /* akses menu: 'rsv' = Reservasi, 'ls' = Laporan Service. Admin dan Approval otomatis; sesi lama (sebelum ada pengaturan ini) tetap terbuka sampai cek akun berikutnya */
 function canMenu(k) { if (!S.me) return false; if (!S.me.menu) return true; return !!S.me.menu[k]; }
 function initial(s) { return String(s || '?').trim().charAt(0).toUpperCase() || '?'; }
@@ -1356,6 +1362,7 @@ function vPk() {
   var p = S.pk;
   var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (p.job && p.job.ck ? KDC[kdOf(p.job)].t : 'Preventive Kendaraan') + '</h2></div>';
   if (p.job) return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div id="pkres"></div></div>' + foot() + '</section>';
+  if (!can('teknik') && !can('ki')) return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div class="vo-note">' + ic('search', 'sm') + '<span><b>Mode lihat.</b> Pekerjaan tunda mekanik tampil di bawah. Hanya mekanik yang bisa meneruskannya.</span></div><div id="pk_td">' + tdInner() + '</div></div>' + foot() + '</section>';
   var dl = (S.data.master || []).map(function (m) { return '<option value="' + esc(m.n) + '">' + esc(m.p + ' - ' + m.j) + '</option>'; }).join('');
   if (!p.jn) p.jn = can('teknik') && !can('ki') ? 'teknik' : (can('ki') && !can('teknik') ? 'ki' : '');   // hanya satu akses: langsung terpilih
   return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div class="pkform">' +
@@ -1402,7 +1409,7 @@ function pkListHtml() {
 }
 function pkListUi() { var el = $('#pk_list'); if (el && S.view === 'jobpk' && !S.pk.job) el.innerHTML = pkListHtml(); }
 /* ---------- pekerjaan TUNDA (Preventive Kendaraan): dihentikan belum selesai, bisa diteruskan siapa pun yang punya akses ---------- */
-function tdRows() { return (S.td.rows || []).filter(function (r) { return (r.j === 'teknik' || r.j === 'ki') && can(r.j); }); }
+function tdRows() { return (S.td.rows || []).filter(function (r) { return (r.j === 'teknik' || r.j === 'ki') && canView(r.j); }); }
 /* label Selesai dari server (T.ssel) + pekerjaan yang baru selesai di HP ini tapi belum terbaca server (T.loc, maks 10 menit): tampil langsung tanpa menunggu */
 function selMerge() {
   var T = S.td, srv = T.ssel || [], out = srv.slice(), now = Date.now();
@@ -1428,14 +1435,15 @@ function pkSelHtml(sl) {
 }
 function tdFor(n, j) { var R = tdRows(), i; for (i = 0; i < R.length; i++) if (R[i].n === n && R[i].j === j) return R[i]; return null; }
 function tdInner() {
-  var R = tdRows(); if (!R.length) return '';
+  var R = tdRows();
+  if (!R.length) return !can('teknik') && !can('ki') ? '<div class="empty">' + (S.td.rows ? 'Tidak ada pekerjaan tunda saat ini.' : 'Memuat pekerjaan tunda...') + '</div>' : '';
   return '<div class="tdl"><div class="tdh">' + ic('clock') + ' Pekerjaan Tunda <b>' + R.length + '</b></div>' + R.map(function (r) {
     var m = S.mi[r.n] || {}, p = isoParts(r.d);
     return '<div class="tdc"><div class="tdc-1">' + nchip(r.n) + '<span class="pill pk-' + r.j + '">' + PKJ[r.j] + '</span></div>' +
       '<small>Ditunda oleh <b>' + esc(r.nm || '-') + '</b> &middot; ' + esc(r.e || '-') + (r.d ? ' &middot; ' + p.d + ' ' + MON[p.m - 1] : '') + (r.m != null ? ' &middot; sudah ' + jamTxt(r.m) : '') + (m.j ? ' &middot; ' + esc(m.j) : '') + '</small>' +
       (r.tc ? '<div class="tdn"><small>Catatan tunda</small><br>' + esc(r.tc) + '</div>' : '') +
       (r.fk ? '<div class="tdfk">' + ic('check', 'sm') + ' Form Fokus sudah tersimpan' + (r.fk !== '-' ? ' (diisi ' + esc(r.fk) + ')' : '') + '. Tidak perlu diisi lagi.</div>' : '') +
-      '<button class="btn" data-act="pkcont" data-a="' + esc(r.id) + '">' + ic('wrench', 'sm') + ' Lanjutkan (jam mulai dari nol)</button></div>';
+      (can(r.j) ? '<button class="btn" data-act="pkcont" data-a="' + esc(r.id) + '">' + ic('wrench', 'sm') + ' Lanjutkan (jam mulai dari nol)</button>' : '<div class="tdvo">' + ic('search', 'sm') + ' Hanya melihat</div>') + '</div>';
   }).join('') + '</div>';
 }
 function tdUi() { var b = $('#pk_td'); if (b && S.view === 'jobpk' && !S.pk.job) { b.innerHTML = tdInner(); pkListUi(); } }
@@ -1819,8 +1827,9 @@ function ckRow(kd, r) {
   else if (tb && pw) { var kq = (j && j.ap && j.ap.kq) || r.kq || ''; kl += '<div class="ck-kt ok"><b>Disetujui pengawas:</b> ' + esc(pw) + (kq ? ' &middot; <b>Kualitas:</b> ' + esc(kq) : '') + '</div>'; }
   if (kd === 'tb' && s.s === 'done' && (j ? j.pem : r.pem === 'Ya')) kl += '<div class="ck-kt pem"><b>Butuh PEM:</b> Ya &middot; diteruskan ke menu PEM</div>';
   if (kd === 'tb' && r.las === 'Selesai' && s.s === 'new') kl += '<div class="ck-kt las-ok"><b>Las / Ketok sudah selesai.</b> Armada siap dicat.</div>';
-  var act;
+  var act, vo = viewOnlyKd(kd);          /* SPV / Admin tanpa akses jenis ini: hanya melihat, tanpa tombol Kerjakan / Lanjutkan */
   if (s.s === 'las') act = '<span class="ck-bd las">' + ic('wrench', 'sm') + ' Di Las / Ketok &middot; ' + (r.las === 'Dikerjakan' ? 'sedang dikerjakan' + (r.lm ? ' oleh ' + esc(r.lm) : '') : (r.las === 'Tunda' ? 'ditunda' + (r.lm ? ' oleh ' + esc(r.lm) : '') : 'menunggu')) + '</span><div class="ck-lh">Cat bisa dikerjakan setelah Las selesai.</div>';
+  else if (s.s === 'new' && vo) act = '<span class="ck-bd vo">' + ic('clock', 'sm') + ' Belum dikerjakan</span>';
   else if (s.s === 'new') act = '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Kerjakan</button>' + (pem ? '' : (las ? '<button class="ck-chg" data-act="lasback" data-a="' + k + '">Kembalikan ke Cat</button>' : '<button class="ck-chg" data-act="ckchg" data-a="' + k + '"' + b + '>Ganti No Mobil</button>'));
   else if (s.s === 'run') act = '<button class="btn ck-go run" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('clock', 'sm') + ' Lanjutkan</button><span class="ck-by">Anda mengerjakan sejak ' + hm(j.s) + '</span>';
   else if (s.s === 'tunda') {
@@ -1829,7 +1838,7 @@ function ckRow(kd, r) {
     act = '<span class="ck-bd td">' + ic('clock', 'sm') + ' Ditunda oleh ' + (s.mine || s.self ? 'Anda' : esc(s.who)) + (jsx && jex ? ' &middot; ' + esc(jsx) + '&ndash;' + esc(jex) : '') + '</span>' +
       (dari ? '<div class="ck-tn"><small>Laporan tanggal ' + dari.d + ' ' + MON[dari.m - 1] + ' &middot; belum selesai, tetap tampil di tiap tanggal</small></div>' : '') +
       (tcx ? '<div class="ck-tn"><small>Catatan tunda:</small> ' + esc(tcx) + '</div>' : '') +
-      '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan</button>';
+      (vo ? '' : '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan</button>');
   }
   else if (s.s === 'other') act = '<span class="ck-bd run">' + ic('wrench', 'sm') + ' Sedang dikerjakan oleh ' + (s.self ? 'Anda (perangkat lain)' : esc(s.who)) + (r.js ? ' sejak ' + esc(r.js) : '') + '</span>';
   else if (s.mine) act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai oleh Anda &middot; ' + hm(j.s) + '&ndash;' + hm(j.e) + '</span>' + (S.pk.job === j ? '<button class="btn ghost ck-see" data-act="ckgo" data-a="' + k + '"' + b + '>Lihat</button>' : '');
@@ -1908,6 +1917,7 @@ function vCk(kd) {
   var C = S[kd], cf = KDC[kd]; if (!C.d) C.d = todayIso();
   var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (kd === 'tb' ? 'Tabrak &middot; Cat' : (kd === 'pem' ? 'Tabrak &middot; PEM' : (kd === 'las' ? 'Tabrak &middot; Las' : cf.t))) + '</h2></div>';
   var head = '<div class="ls-head"><div class="ls-hi">' + ic('wrench') + '</div><div><h3>' + cf.judul + '</h3><p>' + cf.info + '</p></div></div>';
+  if (viewOnlyKd(kd)) head += '<div class="vo-note">' + ic('search', 'sm') + '<span><b>Mode lihat.</b> Daftar dan pekerjaan tunda mekanik tampil di sini. Hanya mekanik yang bisa mengerjakan atau meneruskan.</span></div>';
   return sub + '<section class="pad ck-pad">' + errBanner() + head + '<div class="ls-box"><div id="' + kd + '_nav">' + (kd === 'pem' || kd === 'las' ? '' : ckNav(kd)) + '</div><div id="' + kd + '_stats">' + ckStats(kd) + '</div>' +
     (kd === 'tb' ? '<div class="tb-reg" id="tb_regw">' + tbRegHtml() + '</div>' : '') +
     searchBar(kd + '_q', cf.cari, C.q) + '<div class="ck-inf" id="' + kd + '_inf">' + ckInfoHtml(kd) + '</div><div id="' + kd + '_body">' + ckBody(kd) + '</div></div>' + foot() + '</section>';
@@ -3305,6 +3315,7 @@ var ACT = {
     var R = tdRows(), r = null, i;
     for (i = 0; i < R.length; i++) if (R[i].id === a) r = R[i];
     if (!r) { toast('Pekerjaan tunda ini sudah diteruskan atau tidak ditemukan.', true); tdFetch(); return; }
+    if (!can(r.j)) { toast('Akun Anda tidak punya akses ke ' + PKJ[r.j] + '.', true); return; }
     if (!S.mi[r.n]) { toast('No Mobil ' + r.n + ' tidak ditemukan di Master kendaraan', true); return; }
     var m = S.mi[r.n] || {};
     askStart({ n: r.n, k: r.j, t: PKJ[r.j], td: true, info: (m.j ? '<dt>Jenis</dt><dd>' + esc(m.j) + '</dd>' : '') + '<dt>Ditunda oleh</dt><dd>' + esc(r.nm || 'mekanik lain') + '</dd>' },
