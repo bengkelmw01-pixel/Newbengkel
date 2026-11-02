@@ -203,7 +203,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-02 16:25';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-02 18:12';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -1863,9 +1863,18 @@ function camOpen() {
   }, function (er) { if (my === CAM.run) camFail(er); });
 }
 function camFail(er) {
-  var n = (er && er.name) || '', t = /NotAllowed|Security/i.test(n) ? 'Izin kamera belum diberikan.' : (/NotFound|Overconstrained/i.test(n) ? 'Kamera tidak ditemukan.' : 'Kamera di dalam aplikasi tidak bisa dibuka.'), o = $('#camov');
-  if (!o) return;
-  o.innerHTML = '<div class="cam-fail"><p><b>' + t + '</b></p><p>Foto tetap bisa diambil dengan aplikasi kamera bawaan HP.</p><button type="button" class="btn full" data-act="camnative">Buka Kamera HP</button><button type="button" class="btn ghost full" data-act="camclose">Batal</button></div>';
+  var n = (er && er.name) || '', o = $('#camov'); if (!o) return;
+  var blocked = false, framed = false; try { var fp = document.featurePolicy; blocked = !!(fp && fp.allowsFeature && !fp.allowsFeature('camera')); framed = window.top !== window.self; } catch (e) { framed = true; }
+  var perm = /NotAllowed|Security/i.test(n), t, h;
+  if (blocked) { t = 'Halaman ini dibuka di dalam bingkai yang tidak mengizinkan kamera.'; h = '<p>Buka aplikasi lewat link GitHub Pages (bukan link script.google.com), atau pakai kamera bawaan HP.</p>'; }
+  else if (perm) {
+    t = 'Kamera belum diizinkan untuk browser ini.';
+    h = '<ol class="cam-st"><li>Buka <b>Pengaturan HP</b> &gt; <b>Aplikasi</b> &gt; browser yang dipakai (Chrome / Samsung Internet; atau aplikasi Bengkel bila dipasang di layar utama).</li><li><b>Izin</b> &gt; <b>Kamera</b> &gt; pilih <b>Izinkan hanya saat aplikasi digunakan</b>.</li><li>Kalau masih gagal: ketuk ikon gembok / pengaturan situs di kolom alamat browser &gt; <b>Izin</b> &gt; <b>Kamera</b> &gt; <b>Izinkan</b>.</li><li>Kembali ke sini, tekan <b>Coba Lagi</b>.</li></ol>';
+  } else { t = /NotFound|Overconstrained/i.test(n) ? 'Kamera tidak ditemukan.' : 'Kamera di dalam aplikasi tidak bisa dibuka.'; h = '<p>Foto tetap bisa diambil dengan aplikasi kamera bawaan HP.</p>'; }
+  o.innerHTML = '<div class="cam-fail"><p><b>' + t + '</b></p>' + h +
+    '<button type="button" class="btn full" data-act="camretry">Coba Lagi</button><button type="button" class="btn ghost full" data-act="camnative">Buka Kamera HP</button><button type="button" class="btn ghost full" data-act="camclose">Batal</button>' +
+    '<small class="cam-dg" id="cam_dg">Kode: ' + esc(n || '-') + (framed ? ' &middot; dalam bingkai' : '') + '</small></div>';
+  try { if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'camera' }).then(function (r) { var d = $('#cam_dg'); if (d) d.innerHTML += ' &middot; izin: ' + esc(r.state); }, function () { }); } catch (e) { }
 }
 function camShot() {
   var v = $('#cam_v'); if (!v || !CAM.stream || !v.videoWidth) return;
@@ -4024,6 +4033,7 @@ var ACT = {
   camclose: function () { camClose(); },
   camshot: function () { camShot(); },
   camflip: function () { CAM.face = CAM.face === 'environment' ? 'user' : 'environment'; camOpen(); },
+  camretry: function () { camOpen(); },
   camnative: function () { var inp = CAM.inp; camClose(); if (inp) { inp.value = ''; inp.click(); } },
   phfile: function (a) { phAsk(a, 'ph_file'); },
   ckday: function (a, b) { var kd = kdArg(b), C = S[kd], nd = isoAdd(C.d, +a); if (nd > todayIso()) return; if (kd === 'tb') tbRegReset(); C.d = nd; renderShell(); ckFetch(kd, nd); },
