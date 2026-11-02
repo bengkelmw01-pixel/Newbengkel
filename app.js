@@ -33,7 +33,7 @@ var S = {
   zp: { rows: null, done: [], h: '', busy: false, err: '', last: 0 }, iz: null,
   ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
   td: { rows: null, ssel: [], sel: [], loc: [], h: '', busy: false, err: '' },
-  rs: { cand: null, pend: [], done: [], h: '', busy: false, err: '', last: 0, tab: '', q: '', f: null, saving: 0, dl: 0 },
+  rs: { cand: null, pend: [], done: [], h: '', busy: false, err: '', last: 0, tab: '', q: '', f: null, saving: 0, dl: 0, day: '', kg: null, ka: null, rsb: 0 },
   lc: { d: '', rows: null, h: '', err: '', busy: 0, n: '', cek: null, cekWait: 0, cekFor: '', fo: [null, null, null], up: {}, busyS: 0, prog: '', rq: '', msg: '', done: null, tgt: null, af: null }
 };
 try { var pj0 = JSON.parse(localStorage.getItem('bka_pkjob') || 'null'); if (pj0 && pj0.n && pj0.j && pj0.s) { pj0.id = pj0.id || 'J' + pj0.s + 'x'; S.pk.job = pj0; } } catch (e) {}
@@ -203,7 +203,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-02 18:12';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-03 06:19';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -598,10 +598,12 @@ function usFetch() {
    APPROVAL (Group Head / Section Head) berdiri sendiri: hanya melihat + menyetujui; boleh ditambahkan ke kode lain, mis. "CK,APPROVAL". */
 var AK_JOBS = [['TEKNIK', 'Teknik'], ['KI', 'Keindahan'], ['CAT', 'Cat'], ['CK', 'CK'], ['PS', 'PS'], ['CS', 'CS'], ['LAS', 'Las'], ['PEM', 'PEM']];
 function akParse(s) {
-  var o = { admin: false, apv: false, izin: false, rsv: false, ls: false, set: {} };
+  var o = { admin: false, apv: false, izin: false, rsv: false, ls: false, asgh: false, gdg: false, set: {} };
   String(s == null ? '' : s).toUpperCase().split(/[^A-Z]+/).forEach(function (w) {
     if (!w) return;
-    if (w === 'APPROVAL' || w === 'APPROVER') o.apv = true;
+    if (w === 'ASGH') o.asgh = true;
+    else if (w === 'GUDANG' || w === 'GDG') o.gdg = true;
+    else if (w === 'APPROVAL' || w === 'APPROVER') o.apv = true;
     else if (w === 'IZINPKL') o.izin = true;
     else if (w === 'RESERVASI') o.rsv = true;
     else if (w === 'LAPSERVICE' || w === 'LAPORAN' || w === 'LAPSVC') o.ls = true;
@@ -624,6 +626,8 @@ function akVal(o) {
   if (b) t.push(b);
   if (!o.admin && o.rsv) t.push('RESERVASI');          /* Admin sudah termasuk semua menu */
   if (!o.admin && o.ls) t.push('LAPSERVICE');
+  if (!o.admin && o.asgh) t.push('ASGH');
+  if (!o.admin && o.gdg) t.push('GUDANG');
   if (o.apv) t.push('APPROVAL');
   if (o.izin && !o.apv) t.push('IZINPKL');          /* Approval sudah termasuk meng-ACC izin PKL */
   return t.join(',');
@@ -637,6 +641,8 @@ function akLb(s) {
     else if (b) pt.push(AK_JOBS.filter(function (x) { return o.set[x[0]]; }).map(function (x) { return x[1]; }).join(', '));
     if (o.rsv) pt.push('Reservasi');
     if (o.ls) pt.push('Laporan service');
+    if (o.asgh) pt.push('ASGH');
+    if (o.gdg) pt.push('Gudang');
     t = pt.join(', ');
   }
   if (o.apv) return t ? t + ' + Approval' : 'Approval (hanya melihat + menyetujui)';
@@ -653,14 +659,18 @@ function akChips(o) {
     '<button type="button" class="ak-ch sp adm' + (o.admin ? ' on' : '') + '" data-act="usak" data-a="ADMIN" aria-pressed="' + (o.admin ? 'true' : 'false') + '">' + (o.admin ? ic('check', 'sm') : ic('shield', 'sm')) + 'Admin</button>' +
     '<button type="button" class="ak-ch sp apv' + (o.apv ? ' on' : '') + '" data-act="usak" data-a="APPROVAL" aria-pressed="' + (o.apv ? 'true' : 'false') + '">' + (o.apv ? ic('check', 'sm') : ic('shield', 'sm')) + 'Approval</button>' +
     '<button type="button" class="ak-ch sp izn' + (o.izin || o.apv ? ' on' : '') + (o.apv ? ' lkv' : '') + '" data-act="usak" data-a="IZINPKL" aria-pressed="' + (o.izin || o.apv ? 'true' : 'false') + '">' + (o.izin || o.apv ? ic('check', 'sm') : ic('shield', 'sm')) + 'Izin PKL</button>' +
+    '<span class="ak-sp"></span>' + [['ASGH', 'ASGH', 'asgh'], ['GUDANG', 'Gudang', 'gdg']].map(function (m) {
+      var on = o.admin || o[m[2]];          /* peran Reservasi: ASGH membuat reservasi, Gudang menyiapkan barang */
+      return '<button type="button" class="ak-ch sp rl' + (on ? ' on' : '') + (o.admin ? ' lk' : '') + '" data-act="usak" data-a="' + m[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + (on ? ic('check', 'sm') : ic('shield', 'sm')) + m[1] + '</button>';
+    }).join('') +
     '<span class="ak-sp"></span>' + [['RESERVASI', 'Reservasi', 'rsv'], ['LAPSERVICE', 'Laporan service', 'ls']].map(function (m) {
-      var on = o.admin || o.apv || o[m[2]], lk = o.admin ? ' lk' : (o.apv ? ' lkv' : '');          /* Admin dan Approval otomatis punya akses menu ini */
+      var on = o.admin || o.apv || o[m[2]] || (m[2] === 'rsv' && (o.asgh || o.gdg)), lk = o.admin ? ' lk' : (o.apv || (m[2] === 'rsv' && (o.asgh || o.gdg)) ? ' lkv' : '');          /* Admin dan Approval otomatis punya akses menu ini */
       return '<button type="button" class="ak-ch mn' + (on ? ' on' : '') + lk + '" data-act="usak" data-a="' + m[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + (on ? ic('check', 'sm') : '') + m[1] + '</button>';
     }).join('');
 }
 function akSum(o) {
   var v = akVal(o), work = !!akBase(o);
-  return v ? 'Akses dipilih: <b>' + esc(akLb(v)) + '</b>' + (o.admin ? ' (bisa kelola user)' : '') + (o.apv ? '<br><small>Approval: melihat dan menyetujui pekerjaan yang sudah selesai (Group Head / Section Head), termasuk menu Reservasi dan Laporan service.' + (work ? '' : ' Tidak bisa mengerjakan pekerjaan.') + '</small>' : (!work && !o.admin ? '<br><small>Hanya bisa membuka menu yang dipilih, tidak bisa mengerjakan pekerjaan.</small>' : '')) : 'Belum ada akses dipilih. Klik satu atau lebih tombol di atas.';
+  return v ? 'Akses dipilih: <b>' + esc(akLb(v)) + '</b>' + (o.admin ? ' (bisa kelola user)' : '') + (o.asgh || o.gdg ? '<br><small>' + (o.asgh ? 'ASGH: ' : '') + (o.asgh ? 'membuat reservasi barang setelah di-ACC' : '') + (o.asgh && o.gdg ? '; ' : '') + (o.gdg ? 'Gudang: menyiapkan barang begitu mekanik mengajukan' : '') + '. Langsung diberi tahu saat ada reservasi baru. Otomatis boleh membuka menu Reservasi.</small>' : '') + (o.apv ? '<br><small>Approval: melihat dan menyetujui pekerjaan yang sudah selesai (Group Head / Section Head), termasuk menu Reservasi dan Laporan service.' + (work ? '' : ' Tidak bisa mengerjakan pekerjaan.') + '</small>' : (!work && !o.admin ? '<br><small>Hanya bisa membuka menu yang dipilih, tidak bisa mengerjakan pekerjaan.</small>' : '')) : 'Belum ada akses dipilih. Klik satu atau lebih tombol di atas.';
 }
 function usAkUi() {
   var o = S.users.ak, g = $('#us_akg'), h = $('#us_ak'), m = $('#us_aks'), er = $('#us_err');
@@ -1251,7 +1261,7 @@ function canView(k) { return can(k) || isAdmin() || isApv(); }
 function isPkl() { return !!(S.me && S.me.pkl && !S.me.admin && !S.me.apv); }
 var PKL_VIEWS = ['jobmek', 'jobpk', 'jobcs', 'nomo', 'ck', 'tb', 'pem', 'las', 'tbmenu', 'lc'];
 function canIzin() { return !!(S.me && (S.me.izin || S.me.apv)); }          /* boleh meng-ACC izin mulai kerja PKL: Group Head / Section Head (Approval) atau akses IZINPKL */
-function homeView() { return apHome() ? 'appr' : (isPkl() ? 'jobmek' : 'mon'); }
+function homeView() { return apHome() ? 'appr' : (isPkl() ? 'jobmek' : (rsOpsOnly() && !Object.keys((S.me && S.me.jobs) || {}).length ? 'rsv' : 'mon')); }
 function canViewKd(kd) { return canView(kd === 'tb' ? 'cat' : kd); }
 function viewOnlyKd(kd) { return canViewKd(kd) && !canKd(kd); }
 /* akses menu: 'rsv' = Reservasi, 'ls' = Laporan Service. Admin dan Approval otomatis; sesi lama (sebelum ada pengaturan ini) tetap terbuka sampai cek akun berikutnya */
@@ -1862,6 +1872,14 @@ function camOpen() {
     var m = $('#cam_m'); if (m) m.style.display = 'none'; var b = $('#cam_s'); if (b) b.disabled = false;
   }, function (er) { if (my === CAM.run) camFail(er); });
 }
+/* info singkat untuk diagnosa (tampil kecil di layar gagal kamera): browser, mode aplikasi terpasang, jumlah kamera yang terdeteksi */
+function camEnv() {
+  var ua = navigator.userAgent || '', m = /(SamsungBrowser|EdgA|OPR|Firefox|Chrome|Version)\/(\d+)/.exec(ua), b = m ? ({ SamsungBrowser: 'Samsung Internet', EdgA: 'Edge', OPR: 'Opera', Version: 'Browser bawaan' }[m[1]] || m[1]) + ' ' + m[2] : 'browser ?';
+  if (/; wv\)/.test(ua) || /(FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger)/.test(ua)) b += ' (WebView / dalam aplikasi lain)';
+  var app = false; try { app = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { }
+  var base = b + ' \u00b7 terpasang di layar utama: ' + (app ? 'ya' : 'tidak');
+  try { return navigator.mediaDevices.enumerateDevices().then(function (l) { return base + ' \u00b7 kamera terdeteksi: ' + l.filter(function (x) { return x.kind === 'videoinput'; }).length; }, function () { return base; }); } catch (e) { return Promise.resolve(base); }
+}
 function camFail(er) {
   var n = (er && er.name) || '', o = $('#camov'); if (!o) return;
   var blocked = false, framed = false; try { var fp = document.featurePolicy; blocked = !!(fp && fp.allowsFeature && !fp.allowsFeature('camera')); framed = window.top !== window.self; } catch (e) { framed = true; }
@@ -1874,6 +1892,7 @@ function camFail(er) {
   o.innerHTML = '<div class="cam-fail"><p><b>' + t + '</b></p>' + h +
     '<button type="button" class="btn full" data-act="camretry">Coba Lagi</button><button type="button" class="btn ghost full" data-act="camnative">Buka Kamera HP</button><button type="button" class="btn ghost full" data-act="camclose">Batal</button>' +
     '<small class="cam-dg" id="cam_dg">Kode: ' + esc(n || '-') + (framed ? ' &middot; dalam bingkai' : '') + '</small></div>';
+  camEnv().then(function (t) { var d = $('#cam_dg'); if (d) d.innerHTML += '<br>' + esc(t); });
   try { if (navigator.permissions && navigator.permissions.query) navigator.permissions.query({ name: 'camera' }).then(function (r) { var d = $('#cam_dg'); if (d) d.innerHTML += ' &middot; izin: ' + esc(r.state); }, function () { }); } catch (e) { }
 }
 function camShot() {
@@ -3434,10 +3453,39 @@ function rsItemsFor(kd, sv) {          /* barang otomatis untuk nomor S yang dik
 function rsFormItems(f) { return f.ns ? rsItemsFor(f.kd, f.sv) : f.it; }
 function rsItemTxt(x) { return typeof x === 'string' ? x : x.t + (x.q ? ' ' + x.q : ''); }
 function rsMine(p) { return !!p.bn && String(p.bn).toLowerCase() === String(meNip()).toLowerCase(); }
+/* ---- peran Reservasi: ASGH (membuat reservasi barang setelah di-ACC) dan Gudang (menyiapkan barang begitu mekanik mengajukan, tanpa menunggu ACC) ---- */
+function rsAsgh() { return !!(S.me && S.me.asgh); }
+function rsGdg() { return !!(S.me && S.me.gdg); }
+function rsOps() { return rsAsgh() || rsGdg(); }
+function rsOpsOnly() { return rsOps() && !rsTeknik() && !rsAcc(); }          /* akun ASGH / Gudang saja: langsung ke Laporan */
+function rsAllIt(d) { return (d.au || []).concat(d.ex || []); }
+function rsRvHas(d, t) { return (d.rv || []).indexOf(t) >= 0; }
+function rsAllRv(d) { var a = rsAllIt(d); return a.length > 0 && a.every(function (t) { return rsRvHas(d, t); }); }
+function rsNeedG(d) { return rsGdg() && !d.lg && !d.sb; }          /* Gudang: barang belum disiapkan (juga saat masih menunggu ACC) */
+function rsNeedA(d) { return rsAsgh() && !d.lg && (d.st === 'Menunggu' || !rsAllRv(d)); }          /* ASGH: baru masuk / sudah di-ACC tetapi barang belum semua direservasi */
+function rsNeed(d) { return rsNeedG(d) || rsNeedA(d); }
+function rsCards() { var R = S.rs; return (R.pend || []).concat(R.done || []); }
 function rsCount() {
   var R = S.rs; if (!R.cand) return 0;
-  if (rsAcc() && !rsTeknik()) return R.pend.filter(function (p) { return !rsMine(p); }).length;
-  return (rsTeknik() ? R.cand.filter(function (c) { return !c.tdk; }).length : 0) + (rsAcc() ? R.pend.filter(function (p) { return !rsMine(p); }).length : 0);
+  var ids = {};
+  if (rsAcc()) R.pend.forEach(function (p) { if (!rsMine(p)) ids[p.id] = 1; });
+  if (rsOps()) rsCards().forEach(function (d) { if (rsNeed(d)) ids[d.id] = 1; });
+  return (rsTeknik() ? R.cand.filter(function (c) { return !c.tdk; }).length : 0) + Object.keys(ids).length;
+}
+/* pemberitahuan reservasi baru untuk ASGH / Gudang (selain angka merah): muncul sekali saat data baru masuk, bukan saat pertama kali dimuat */
+function rsNotify() {
+  var R = S.rs, g = {}, a = {}, ms = [];
+  if (rsOps()) rsCards().forEach(function (d) { if (rsNeedG(d)) g[d.id] = d; if (rsNeedA(d)) a[d.id + ':' + d.st] = d; });
+  if (R.kg && R.ka) {
+    Object.keys(g).forEach(function (k) { if (!R.kg[k]) ms.push('Reservasi baru ' + g[k].n + '. Persiapkan barang segera!'); });
+    Object.keys(a).forEach(function (k) {
+      var d = a[k]; if (R.ka[k] || (g[d.id] && !R.kg[d.id])) return;
+      ms.push(d.st === 'Disetujui' ? d.n + ' sudah di-ACC. Buatkan reservasinya!' : 'Reservasi baru ' + d.n + ' masuk, menunggu ACC.');
+    });
+  }
+  R.kg = {}; R.ka = {};
+  Object.keys(g).forEach(function (k) { R.kg[k] = 1; }); Object.keys(a).forEach(function (k) { R.ka[k] = 1; });
+  if (ms.length) toast(ms[0] + (ms.length > 1 ? ' (+' + (ms.length - 1) + ' lagi)' : ''));
 }
 function rsBadge() {
   var n = rsCount(), b = $('#rsbadge');
@@ -3485,7 +3533,7 @@ function rsFetch(force) {
     R.busy = false; R.err = '';
     if (r && r.cand) {
       R.cand = r.cand; R.pend = r.pend || []; R.done = r.done || []; R.h = r.h || ''; if (r.rl) R.rl = r.rl;
-      rsBadge(); if (S.view === 'rsv') rerender();
+      rsBadge(); rsNotify(); if (S.view === 'rsv') rerender();
     }
   }, function (er) { R.busy = false; R.err = rsMsg(er); if (S.view === 'rsv' && !R.cand) rerender(); });
 }
@@ -3495,12 +3543,13 @@ function rsMsg(e) {
   return /reading 'apply'|is not a function|not a function/.test(m) ? 'Server belum diperbarui. Tempel Code.gs terbaru di Apps Script, Simpan, lalu Deploy > Kelola deployment > Edit > Versi baru > Deploy.' : m;
 }
 setInterval(function () { if (!document.hidden && S.me && S.data && S.auth === 'ok' && S.view !== 'rsvform') rsFetch(); }, window.BKA_RS_POLL_MS || window.BKA_AP_POLL_MS || POLL_MS);
-function rsReset() { S.rs.cand = null; S.rs.pend = []; S.rs.done = []; S.rs.h = ''; S.rs.f = null; S.rs.tab = ''; S.rs.q = ''; rsBadge(); }
-function rsTab() { var R = S.rs; return R.tab || (rsAcc() && !rsTeknik() ? 'acc' : 'isi'); }
+function rsReset() { S.rs.cand = null; S.rs.pend = []; S.rs.done = []; S.rs.h = ''; S.rs.f = null; S.rs.tab = ''; S.rs.q = ''; S.rs.day = ''; S.rs.kg = null; S.rs.ka = null; S.rs.rsb = 0; rsBadge(); }
+function rsTab() { var R = S.rs; return rsOpsOnly() ? 'lap' : (R.tab || (rsAcc() && !rsTeknik() ? 'acc' : 'isi')); }
+/* daftar barang ke bawah (satu barang satu baris); barang tambahan diberi tanda */
 function rsChips(list, ex) {
-  var h = list.map(function (x) { return '<span class="rs-chip">' + esc(rsItemTxt(x)) + '</span>'; }).join('');
-  (ex || []).forEach(function (x) { h += '<span class="rs-chip man">' + esc(x) + '</span>'; });
-  return h || '<span class="rs-none">Tidak ada barang</span>';
+  var h = (list || []).map(function (x) { return '<li><span class="rs-dot"></span><b>' + esc(rsItemTxt(x)) + '</b></li>'; }).join('');
+  (ex || []).forEach(function (x) { h += '<li><span class="rs-dot"></span><b>' + esc(x) + '</b><em class="mn">tambahan</em></li>'; });
+  return h ? '<ul class="rs-items sm">' + h + '</ul>' : '<span class="rs-none">Tidak ada barang</span>';
 }
 function rsJst(s) { return s === 'Berjalan' ? 'Sedang dikerjakan' : s === 'Tunda' ? 'Ditunda' : s === 'Selesai' ? 'Selesai dikerjakan' : ''; }
 function rsCandCard(c) {
@@ -3523,16 +3572,73 @@ function rsPendCard(p) {
     (tk ? '<button class="btn ghost ap-bt" data-act="rsopen" data-a="' + esc(p.id) + '">' + ic('clip', 'sm') + ' Ubah</button>' : '') +
     (apv ? '<button class="btn pkdone ap-bt" data-act="rsacc" data-a="' + esc(p.id) + '"' + (own ? ' disabled' : '') + '>' + ic('shield', 'sm') + ' ACC</button>' : '') + '</div></div>';
 }
-function rsDoneCard(d) {
-  return '<div class="ap-card done rs-card"><div class="ap-c1">' + nchip(d.n) + '<span class="pill pk-teknik">Service ' + esc(d.sv) + '</span><span class="ap-ago">' + esc(pkDmy(d.aw)) + '</span></div>' +
-    '<div class="ap-c2"><b>' + esc(d.mk || '-') + '</b><span>' + esc(d.jn || '-') + '</span></div>' +
-    '<div class="ap-tx"><small>Barang (' + (d.au.length + d.ex.length) + ')</small><div class="rs-chips">' + rsChips(d.au, d.ex) + '</div></div>' +
-    '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>' +
-    '<button class="btn ghost ap-bt" data-act="rsview" data-a="' + esc(d.id) + '">' + ic('report', 'sm') + ' Laporan Reservasi</button></div>';
+/* barang belum direservasi di atas, yang sudah direservasi di bawah (data lama sebelum alur ASGH / Gudang: urutan asli) */
+function rsOrdered(d) {
+  var na = (d.au || []).length, o = rsAllIt(d).map(function (t, i) { return { t: t, i: i, man: i >= na, rv: !d.lg && rsRvHas(d, t) }; });
+  return o.filter(function (x) { return !x.rv; }).concat(o.filter(function (x) { return x.rv; }));
 }
-function rsDoneRows() {
-  var q = norm(S.rs.q).replace(/#/g, '').trim();
-  return (S.rs.done || []).filter(function (d) { return !q || norm([d.n, d.sv, d.jn, d.mk, d.ap].join(' ')).indexOf(q) >= 0; });
+function rsItemsList(d, act) {
+  var id = esc(d.id), h = rsOrdered(d).map(function (x) {
+    return '<li' + (x.rv ? ' class="rv"' : '') + '><span class="rs-dot"></span><b>' + esc(x.t) + '</b>' + (x.man ? '<em class="mn">tambahan</em>' : '') +
+      (d.lg ? '' : x.rv ? (act ? '<button class="rs-undo" data-act="rsrvx" data-a="' + id + '" data-b="' + x.i + '">Batal</button>' : '<em>Sudah direservasi</em>')
+        : (act ? '<button class="rs-do" data-act="rsrv" data-a="' + id + '" data-b="' + x.i + '">' + ic('check', 'sm') + ' Direservasi</button>' : '')) + '</li>';
+  }).join('');
+  return h ? '<ul class="rs-items rs-lst">' + h + '</ul>' : '<span class="rs-none">Tidak ada barang</span>';
+}
+function rsBanner(d) {
+  if (d.lg) return '';
+  var acc = d.st === 'Disetujui', h = '';
+  if (rsGdg()) h += d.sb ? '<div class="rs-bn ok">' + ic('check', 'sm') + '<span>Barang sudah disiapkan &middot; ' + esc(d.sb) + (d.sw ? ' &middot; ' + hm(d.sw) + ' &middot; ' + pkDmy(d.sw) : '') + '</span></div>'
+    : '<div class="rs-bn hot">' + ic('warn', 'sm') + '<span><b>Persiapkan barang segera.</b> ' + (acc ? 'Sudah di-ACC.' : 'Boleh disiapkan sekarang, tidak perlu menunggu ACC.') + '</span></div>';
+  if (rsAsgh()) h += !acc ? '<div class="rs-bn wait">' + ic('clock', 'sm') + '<span>Menunggu ACC Group Head / Section Head. Setelah di-ACC, buatkan reservasinya.</span></div>'
+    : rsAllRv(d) ? '<div class="rs-bn ok">' + ic('check', 'sm') + '<span>Semua barang sudah direservasi &middot; ' + esc(d.rb || '-') + (d.rw ? ' &middot; ' + hm(d.rw) + ' &middot; ' + pkDmy(d.rw) : '') + '</span></div>'
+    : '<div class="rs-bn hot">' + ic('warn', 'sm') + '<span><b>Sudah di-ACC. Buatkan reservasinya.</b> Tandai barang yang sudah direservasi.</span></div>';
+  return h;
+}
+function rsPills(d) {
+  var n = rsAllIt(d).length, r = rsOrdered(d).filter(function (x) { return x.rv; }).length;
+  return '<div class="rs-pills"><span class="rs-pl ' + (d.st === 'Disetujui' ? 'ok' : 'wt') + '">' + (d.st === 'Disetujui' ? 'Di-ACC' : 'Menunggu ACC') + '</span>' +
+    '<span class="rs-pl ' + (n && r >= n ? 'ok' : r ? 'pt' : 'no') + '">Reservasi ' + r + '/' + n + '</span>' +
+    '<span class="rs-pl ' + (d.sb ? 'ok' : 'no') + '">' + (d.sb ? 'Gudang sudah siap' : 'Gudang belum siap') + '</span></div>';
+}
+function rsLapCard(d) {
+  var acc = d.st === 'Disetujui', act = rsAsgh() && acc && !d.lg, rem = rsOrdered(d).filter(function (x) { return !x.rv; }).length, id = esc(d.id), bt = '';
+  if (act && rem) bt += '<button class="btn pkdone ap-bt" data-act="rsrvall" data-a="' + id + '">' + ic('check', 'sm') + ' Semua barang sudah direservasi</button>';
+  if (rsGdg() && !d.lg) bt += d.sb ? '<button class="btn ghost ap-bt" data-act="rssiap" data-a="' + id + '" data-b="0">Batalkan tanda disiapkan</button>'
+    : '<button class="btn pkdone ap-bt" data-act="rssiap" data-a="' + id + '" data-b="1">' + ic('check', 'sm') + ' Barang sudah disiapkan</button>';
+  if (acc) bt += '<button class="btn ghost ap-bt" data-act="rsview" data-a="' + id + '">' + ic('report', 'sm') + ' Laporan Reservasi</button>';
+  return '<div class="ap-card rs-card' + (rsNeed(d) ? '' : ' done') + '" data-rs="' + id + '"><div class="ap-c1">' + nchip(d.n) + '<span class="pill pk-teknik">Service ' + esc(d.sv) + '</span><span class="ap-ago">' + esc(pkDmy(d.at)) + ' ' + hm(d.at) + '</span></div>' +
+    '<div class="ap-c2"><b>' + esc(d.mk || '-') + '</b><span>' + esc(d.jn || '-') + '</span></div>' + rsBanner(d) +
+    '<div class="ap-tx"><small>Barang (' + rsAllIt(d).length + ')</small>' + rsItemsList(d, act) + '</div>' +
+    (d.ket ? '<div class="ap-tx"><small>Keterangan</small>' + esc(d.ket) + '</div>' : '') +
+    (d.lg ? '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>'
+      : rsPills(d) + (acc ? '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>' : '')) +
+    (bt ? '<div class="rs-bts">' + bt + '</div>' : '') + '</div>';
+}
+function rsDayCur() { var d = S.rs.day; return d === 'all' ? 'all' : (d || todayIso()); }
+/* isi tab Laporan: reservasi pada tanggal yang dipilih (default hari ini). Yang belum tuntas untuk peran ASGH / Gudang tetap muncul di hari ini walau dibuat kemarin. */
+function rsLapRows() {
+  var R = S.rs, q = norm(R.q).replace(/#/g, '').trim(), d0 = rsDayCur(), t0 = todayIso();
+  var rows = (rsOps() ? R.pend : []).concat(R.done || []).filter(function (d) {
+    if (q && norm([d.n, d.sv, d.jn, d.mk, d.ap, d.by].join(' ')).indexOf(q) < 0) return false;
+    if (d0 === 'all') return true;
+    var dd = isoOf(new Date(d.at));
+    return dd === d0 || (d0 === t0 && dd < t0 && rsNeed(d));
+  });
+  rows.sort(function (a, b) { return (rsNeed(b) ? 1 : 0) - (rsNeed(a) ? 1 : 0) || b.at - a.at; });
+  return rows;
+}
+function rsNav() {
+  var d = rsDayCur(), t0 = todayIso(), all = d === 'all', p = isoParts(all ? t0 : d);
+  return '<div class="ls-nav rs-nav"><button class="lj-cb' + (all ? ' off' : '') + '" data-act="rsday" data-a="-1" aria-label="Hari sebelumnya">' + ic('chev', 'flip') + '</button>' +
+    '<div class="lbl"><b>' + (all ? 'Semua tanggal' : HARI[isoDow(d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y) + '</b><small>' + (d === t0 ? 'Hari ini' : '<a data-act="rsday" data-a="0">Kembali ke hari ini</a>') + (all ? '' : ' &middot; <a data-act="rsday" data-a="all">Semua tanggal</a>') + '</small></div>' +
+    '<label class="lj-cb" aria-label="Pilih tanggal">' + ic('cal') + '<input type="date" id="rs_day" value="' + (all ? t0 : d) + '" max="' + t0 + '"></label>' +
+    '<button class="lj-cb' + (all || d >= t0 ? ' off' : '') + '" data-act="rsday" data-a="1" aria-label="Hari berikutnya"' + (all || d >= t0 ? ' disabled' : '') + '>' + ic('chev') + '</button></div>';
+}
+function rsLapEmpty() {
+  var d = rsDayCur(), t0 = todayIso(), R = S.rs;
+  if (R.q.trim()) return 'Tidak ada reservasi yang cocok.';
+  return d === 'all' ? 'Belum ada reservasi.' : d === t0 ? 'Belum ada reservasi hari ini.' : 'Tidak ada reservasi pada tanggal ini.';
 }
 function rsListHtml() {
   var R = S.rs, tab = rsTab(), body;
@@ -3543,21 +3649,24 @@ function rsListHtml() {
   else if (tab === 'acc') body = R.pend.length ? '<div class="ap-list">' + R.pend.map(rsPendCard).join('') + '</div>'
     : '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang menunggu ACC</b>Reservasi yang diajukan mekanik muncul di sini.</div>';
   else {
-    var rows = rsDoneRows();
-    body = rows.length ? '<div class="ap-list">' + rows.map(rsDoneCard).join('') + '</div>' : '<div class="empty">' + (R.done.length ? 'Tidak ada laporan yang cocok.' : 'Belum ada reservasi yang di-ACC.') + '</div>';
+    var rows = rsLapRows();
+    body = rows.length ? '<div class="ap-list">' + rows.map(rsLapCard).join('') + '</div>' : '<div class="empty">' + esc(rsLapEmpty()) + '</div>';
   }
   return body;
 }
 function rsListUi() { var el = $('#rs_list'); if (el && S.view === 'rsv') el.innerHTML = rsListHtml(); }
 function vRsv() {
-  var R = S.rs, tab = rsTab(), nI = R.cand ? R.cand.length : 0, nA = R.pend.length, nL = R.done.length;
-  var tabs = '<div class="ls-mode ap-tabs rs-tabs">' +
+  var R = S.rs, tab = rsTab(), nI = R.cand ? R.cand.length : 0, nA = R.pend.length, nL = R.cand ? rsLapRows().length : 0, only = rsOpsOnly();
+  var tabs = only ? '' : '<div class="ls-mode ap-tabs rs-tabs">' +
     [['isi', 'Perlu diisi', nI], ['acc', 'Menunggu ACC', nA], ['lap', 'Laporan', nL]].map(function (t) { return '<button class="' + (tab === t[0] ? 'on' : '') + '" data-act="rstab" data-a="' + t[0] + '">' + t[1] + (R.cand ? ' (' + t[2] + ')' : '') + '</button>'; }).join('') + '</div>';
-  var note = rsAcc() && !rsTeknik() ? 'Reservasi barang dari mekanik menunggu ACC Anda' + (S.me && S.me.jabatan ? ' sebagai <b>' + esc(S.me.jabatan) + '</b>' : '') + '. Salah satu Group Head / Section Head cukup.'
+  var note = only ? (rsGdg() && rsAsgh() ? 'Reservasi dari mekanik langsung tampil di sini. <b>Gudang:</b> persiapkan barang segera, tidak perlu menunggu ACC. <b>ASGH:</b> setelah di-ACC, buatkan reservasinya.'
+      : rsGdg() ? 'Reservasi dari mekanik langsung tampil di sini. <b>Persiapkan barang segera</b>, tidak perlu menunggu ACC.'
+      : 'Reservasi dari mekanik langsung tampil di sini. Setelah di-ACC Group Head / Section Head, <b>buatkan reservasinya</b> dan tandai barang yang sudah direservasi.')
+    : rsAcc() && !rsTeknik() ? 'Reservasi barang dari mekanik menunggu ACC Anda' + (S.me && S.me.jabatan ? ' sebagai <b>' + esc(S.me.jabatan) + '</b>' : '') + '. Salah satu Group Head / Section Head cukup.'
     : 'Mobil yang sedang dikerjakan Service Teknik otomatis masuk di sini lengkap dengan barang yang harus diganti. Pilih reservasi atau tidak; bila ya, Group Head / Section Head akan meng-ACC.';
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Reservasi</h2></div>' +
     '<section class="pad">' + errBanner() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' + tabs +
-    (tab === 'lap' ? '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
+    (tab === 'lap' ? rsNav() + '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
     '<div id="rs_list">' + rsListHtml() + '</div>' + foot() + '</section>';
 }
 /* ---- form (Nomor mobil, Mekanik, Jenis, Service, Keterangan, daftar barang, Tambahan barang, Ya / Tidak) ---- */
@@ -3619,6 +3728,39 @@ function rsSend(y) {
     ['rs_ya', 'rs_tdk'].forEach(function (id) { var b = $('#' + id); if (b) b.disabled = false; });
   });
 }
+function rsAny(id) { var l = rsCards(), i; for (i = 0; i < l.length; i++) if (l[i].id === id) return l[i]; return null; }
+/* ASGH: tandai barang sudah / belum direservasi (idx = nomor barang di kartu; null = semua barang) */
+function rsReserve(id, idx, on) {
+  var R = S.rs, d = rsAny(id);
+  if (!d) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
+  if (!rsAsgh()) { toast('Hanya akun ASGH yang menandai barang sudah direservasi.', true); return; }
+  if (R.rsb) return;
+  R.rsb = 1;
+  var all = rsAllIt(d), p = { u: meNip(), id: id, on: on };
+  if (idx) p.it = idx.map(function (i) { return all[i]; }).filter(String); else p.all = 1;
+  gs('rsvReserve', [p]).then(function (r) {
+    R.rsb = 0;
+    if (r && r.rv) { d.rv = r.rv; d.rb = r.rb || ''; d.rw = r.rw || 0; }
+    R.h = ''; rsBadge(); rsListUi();
+    toast(r && r.done ? 'Semua barang sudah direservasi' : on ? 'Barang ditandai sudah direservasi' : 'Tanda reservasi dibatalkan');
+    rsFetch(true);
+  }, function (e) { R.rsb = 0; toast(rsMsg(e), true); rsFetch(true); });
+}
+/* Gudang: tandai barang sudah disiapkan (boleh sebelum di-ACC) */
+function rsSiap(id, on) {
+  var R = S.rs, d = rsAny(id);
+  if (!d) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
+  if (!rsGdg()) { toast('Hanya akun Gudang yang menandai barang sudah disiapkan.', true); return; }
+  if (R.rsb) return;
+  R.rsb = 1;
+  gs('rsvSiap', [{ u: meNip(), id: id, on: on }]).then(function (r) {
+    R.rsb = 0;
+    if (r && r.ok) { d.sb = r.sb || ''; d.sw = r.sw || 0; }
+    R.h = ''; rsBadge(); rsListUi();
+    toast(on ? 'Barang ditandai sudah disiapkan' : 'Tanda disiapkan dibatalkan');
+    rsFetch(true);
+  }, function (e) { R.rsb = 0; toast(rsMsg(e), true); rsFetch(true); });
+}
 function rsAccModal(p) {
   showModal('<div class="sh-head"><b>ACC Reservasi</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(p.n) + '</b> <span class="pill pk-teknik">Service ' + esc(p.sv) + '</span>' +
@@ -3629,30 +3771,33 @@ function rsAccModal(p) {
     '<button class="btn full pkbtn pkdone" id="rs_accok" data-act="rsaccok" data-a="' + esc(p.id) + '">' + ic('shield', 'sm') + ' Ya, ACC Reservasi</button>');
 }
 function rsViewModal(d) {
+  var ord = rsOrdered(d);
   showModal('<div class="sh-head"><b>Laporan Reservasi</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(d.n) + '</b> <span class="pill pk-teknik">Service ' + esc(d.sv) + '</span>' +
-    '<dl class="kv"><dt>Jenis</dt><dd>' + esc(d.jn || '-') + '</dd><dt>Mekanik</dt><dd>' + esc(d.mk || '-') + '</dd><dt>Diajukan</dt><dd>' + esc(d.by || '-') + ' &middot; ' + pkDmy(d.at) + '</dd><dt>Di-ACC</dt><dd>' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</dd></dl></div>' +
-    '<table class="rs-tbl"><thead><tr><th>No</th><th>Barang</th><th>Sumber</th></tr></thead><tbody>' +
-    d.au.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x) + '</td><td>Otomatis</td></tr>'; }).join('') +
-    d.ex.map(function (x, i) { return '<tr><td>' + (d.au.length + i + 1) + '</td><td>' + esc(x) + '</td><td>Tambahan</td></tr>'; }).join('') + '</tbody></table>' +
+    '<dl class="kv"><dt>Jenis</dt><dd>' + esc(d.jn || '-') + '</dd><dt>Mekanik</dt><dd>' + esc(d.mk || '-') + '</dd><dt>Diajukan</dt><dd>' + esc(d.by || '-') + ' &middot; ' + pkDmy(d.at) + '</dd><dt>Di-ACC</dt><dd>' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</dd>' +
+    (d.lg ? '' : '<dt>Direservasi</dt><dd>' + (d.rb ? esc(d.rb) + (d.rw ? ' &middot; ' + hm(d.rw) + ' &middot; ' + pkDmy(d.rw) : '') : 'Belum') + '</dd><dt>Gudang</dt><dd>' + (d.sb ? 'Disiapkan ' + esc(d.sb) + (d.sw ? ' &middot; ' + hm(d.sw) + ' &middot; ' + pkDmy(d.sw) : '') : 'Belum disiapkan') + '</dd>') + '</dl></div>' +
+    '<table class="rs-tbl"><thead><tr><th>No</th><th>Barang</th><th>Sumber</th>' + (d.lg ? '' : '<th>Status</th>') + '</tr></thead><tbody>' +
+    ord.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.t) + '</td><td>' + (x.man ? 'Tambahan' : 'Otomatis') + '</td>' + (d.lg ? '' : '<td>' + (x.rv ? 'Sudah direservasi' : 'Belum') + '</td>') + '</tr>'; }).join('') + '</tbody></table>' +
     (d.ket ? '<div class="ap-tx" style="margin-top:8px"><small>Keterangan</small>' + esc(d.ket) + '</div>' : '') +
     '<button class="btn full pkbtn" data-act="rsxl1" data-a="' + esc(d.id) + '">' + ic('report', 'sm') + ' Unduh Excel</button>');
 }
 function rsBuildBook(list, title) {
   var wb = XL.book(), st = lsStyles(wb), sh = wb.sheet('Laporan Reservasi');
-  var H = ['No', 'Tanggal ACC', 'No Mobil', 'Jenis Mobil', 'Service', 'Barang', 'Sumber', 'Mekanik', 'Diajukan Oleh', 'Disetujui Oleh', 'Keterangan'], W = [5, 13, 11, 18, 9, 30, 11, 20, 18, 18, 30], r = 5, no = 0;
+  var H = ['No', 'Tanggal', 'No Mobil', 'Jenis Mobil', 'Service', 'Barang', 'Sumber', 'Status Barang', 'Mekanik', 'Diajukan Oleh', 'Status ACC', 'Disetujui Oleh', 'Disiapkan Gudang', 'Keterangan'],
+    W = [5, 13, 11, 18, 9, 30, 11, 18, 20, 18, 15, 18, 20, 30], r = 5, no = 0;
   sh.put(1, 1, 'LAPORAN RESERVASI BARANG', st.h1); sh.put(2, 1, title, st.h2);
-  sh.put(3, 1, 'Total ' + list.length + ' reservasi yang sudah di-ACC Group Head / Section Head', st.txt);
+  sh.put(3, 1, 'Total ' + list.length + ' reservasi (barang yang belum direservasi di atas, yang sudah direservasi di bawah)', st.txt);
   H.forEach(function (t, c) { sh.put(4, c + 1, t, st.th); sh.width(c + 1, W[c]); }); sh.height(4, 26);
   list.forEach(function (d) {
-    d.au.map(function (x) { return [x, 'Otomatis']; }).concat(d.ex.map(function (x) { return [x, 'Tambahan']; })).forEach(function (b) {
+    rsOrdered(d).forEach(function (b) {
       no++;
-      var vals = [no, pkDmy(d.aw), d.n, d.jn || '', d.sv, b[0], b[1], d.mk || '', d.by || '', d.ap || '', d.ket || ''], cen = { 1: 1, 2: 1, 3: 1, 5: 1, 7: 1 };
+      var vals = [no, pkDmy(d.at), d.n, d.jn || '', d.sv, b.t, b.man ? 'Tambahan' : 'Otomatis', d.lg ? '-' : (b.rv ? 'Sudah direservasi' : 'Belum direservasi'), d.mk || '', d.by || '',
+        d.st === 'Disetujui' ? 'Di-ACC ' + pkDmy(d.aw) : 'Menunggu ACC', d.ap || '', d.lg ? '-' : (d.sb ? d.sb + (d.sw ? ' ' + pkDmy(d.sw) : '') : 'Belum'), d.ket || ''], cen = { 1: 1, 2: 1, 3: 1, 5: 1, 7: 1, 8: 1, 11: 1 };
       vals.forEach(function (v, c) { sh.put(r, c + 1, v, cen[c + 1] ? st.tc : st.td); });
       r++;
     });
   });
-  sh.freeze = 4; sh.filter = 'A4:K' + Math.max(r - 1, 5); sh.land = true;
+  sh.freeze = 4; sh.filter = 'A4:N' + Math.max(r - 1, 5); sh.land = true;
   return wb;
 }
 function rsExport(list, title, fname) {
@@ -3665,6 +3810,17 @@ function rsExport(list, title, fname) {
 var ACT = {
   menu: openMenu, close: closeMenu, closemodal: closeModal,
   rstab: function (a) { S.rs.tab = a === 'acc' || a === 'lap' ? a : 'isi'; if (S.view === 'rsv') rerender(); },
+  rsday: function (a) {
+    var R = S.rs, cur = rsDayCur(), t0 = todayIso(), nd;
+    if (a === 'all') nd = 'all';
+    else if (a === '0') nd = '';
+    else { if (cur === 'all') return; nd = isoAdd(cur, +a); if (nd > t0) return; if (nd === t0) nd = ''; }
+    R.day = nd; if (S.view === 'rsv') rerender();
+  },
+  rsrv: function (a, b) { rsReserve(a, [+b], 1); },
+  rsrvx: function (a, b) { rsReserve(a, [+b], 0); },
+  rsrvall: function (a) { rsReserve(a, null, 1); },
+  rssiap: function (a, b) { rsSiap(a, b === '0' ? 0 : 1); },
   rsopen: function (a) {
     if (!rsTeknik()) { toast('Hanya mekanik Service Teknik yang mengisi Reservasi.', true); return; }
     var x = rsFind(a); if (!x) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
@@ -3687,16 +3843,16 @@ var ACT = {
     }, function (e) { var er = $('#rs_aerr'); if (er) er.textContent = rsMsg(e); if (b) b.disabled = false; });
   },
   rsview: function (a) {
-    var i, d = null; for (i = 0; i < S.rs.done.length; i++) if (S.rs.done[i].id === a) d = S.rs.done[i];
+    var d = rsAny(a);
     if (d) rsViewModal(d);
   },
   rsxl: function () {
-    var rows = rsDoneRows(); if (!rows.length) { toast('Belum ada laporan untuk diunduh.', true); return; }
-    var q = S.rs.q.trim();
-    rsExport(rows, 'Per ' + pkDmy(Date.now()) + (q ? '   |   Cari : ' + q : ''), 'Laporan Reservasi ' + pkDmy(Date.now()).replace(/\//g, '-') + '.xlsx');
+    var rows = rsLapRows(); if (!rows.length) { toast('Belum ada laporan untuk diunduh.', true); return; }
+    var q = S.rs.q.trim(), dc = rsDayCur(), tg = dc === 'all' ? 'Semua tanggal' : 'Tanggal ' + pkDmy(Date.parse(dc + 'T12:00:00'));
+    rsExport(rows, tg + '   |   Dicetak ' + pkDmy(Date.now()) + (q ? '   |   Cari : ' + q : ''), 'Laporan Reservasi ' + (dc === 'all' ? 'semua' : pkDmy(Date.parse(dc + 'T12:00:00')).replace(/\//g, '-')) + '.xlsx');
   },
   rsxl1: function (a) {
-    var i, d = null; for (i = 0; i < S.rs.done.length; i++) if (S.rs.done[i].id === a) d = S.rs.done[i];
+    var d = rsAny(a);
     if (d) rsExport([d], 'Mobil ' + d.n + '   |   Service ' + d.sv, 'Laporan Reservasi ' + d.n + ' ' + d.sv + '.xlsx');
   },
   monref: function () { monFetch(true); },
@@ -4189,8 +4345,15 @@ var ACT = {
   },
   usak: function (a) {
     var o = S.users.ak; if (!o) return;
+    if (a === 'ASGH' || a === 'GUDANG') {
+      var rk = a === 'ASGH' ? 'asgh' : 'gdg';
+      if (o.admin) { o.admin = false; AK_JOBS.forEach(function (x) { o.set[x[0]] = 1; }); o.rsv = true; o.ls = true; o.asgh = true; o.gdg = true; o[rk] = false; }
+      else o[rk] = !o[rk];
+      usAkUi(); return;
+    }
     if (a === 'RESERVASI' || a === 'LAPSERVICE') {
       var mk = a === 'RESERVASI' ? 'rsv' : 'ls';
+      if (a === 'RESERVASI' && !o.admin && !o.apv && (o.asgh || o.gdg)) { toast('ASGH / Gudang sudah termasuk menu Reservasi.'); return; }
       if (o.admin) { o.admin = false; AK_JOBS.forEach(function (x) { o.set[x[0]] = 1; }); o.rsv = true; o.ls = true; o[mk] = false; }
       else if (o.apv) { toast('Akses Approval sudah termasuk Reservasi dan Laporan service.'); return; }
       else o[mk] = !o[mk];
@@ -4277,6 +4440,11 @@ document.addEventListener('change', function (e) {
   if (/^(ck|tb|pem|las)_d$/.test(e.target.id || '')) {
     var cv = e.target.value, ct = todayIso(), kc = e.target.id.split('_')[0];
     if (/^\d{4}-\d{2}-\d{2}$/.test(cv)) { if (cv > ct) cv = ct; if (kc === 'tb') tbRegReset(); S[kc].d = cv; renderShell(); ckFetch(kc, cv); }
+    return;
+  }
+  if (e.target.id === 'rs_day') {
+    var rv = e.target.value, rt = todayIso();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rv)) { if (rv > rt) rv = rt; S.rs.day = rv === rt ? '' : rv; if (S.view === 'rsv') rerender(); }
     return;
   }
   if (e.target.id === 'ls_d') {
