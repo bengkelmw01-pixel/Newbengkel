@@ -306,7 +306,7 @@ var JOBS = [
 function vJob() {
   var pk = isPkl(), lst = pk ? JOBS.filter(function (j) { return j.acc ? j.acc() : true; }) : JOBS;
   return '<div class="subhead">' + (pk ? '' : '<button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button>') + '<h2>Job Mekanik</h2></div>' +
-    '<section class="pad">' + errBanner() + (pk ? '<div class="ap-note">' + ic('shield') + '<div>Sebelum mulai mengerjakan, Anda perlu ACC dari Section Head / Group Head atau Devi. Tekan <b>Kerjakan</b>, lalu tunggu sampai disetujui.</div></div>' : '') + (pk && !lst.length ? '<div class="empty">Belum ada pekerjaan yang diberikan ke akun Anda.<br><small>Hubungi admin.</small></div>' : '') + '<div class="jobs">' + lst.map(function (j) {
+    '<section class="pad">' + errBanner() + (pk ? '<div class="ap-note">' + ic('shield') + '<div>Sebelum mulai mengerjakan, Anda perlu ACC dari Section Head / Group Head atau Devi. Tekan <b>Kerjakan</b>, lalu tunggu sampai disetujui. Kecuali CS <b>Tambah ban</b>: langsung mulai tanpa ACC.</div></div>' : '') + (pk && !lst.length ? '<div class="empty">Belum ada pekerjaan yang diberikan ke akun Anda.<br><small>Hubungi admin.</small></div>' : '') + '<div class="jobs">' + lst.map(function (j) {
       var okj = j.acc ? j.acc() : true;
       return '<button class="jcard ' + j.cls + (okj ? '' : ' lock') + '" ' + (okj ? 'data-go="' + (j.go || 'soon:' + esc(j.t)) + '"' : 'data-act="nojob" data-a="' + esc(j.t) + '"') + ' aria-label="' + esc(j.t) + '"><img class="jimg" src="' + JOB_IMG[j.img] + '" alt="">' +
         (okj ? (j.vo && j.vo() ? '<span class="jlk vo">' + ic('search') + 'Hanya lihat</span>' : '') : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + '<span class="jbadge">' + j.k + '</span><span class="jt">' + j.t.replace(' ', '<br>') + '</span></button>';
@@ -1335,6 +1335,7 @@ function pkSync() {
   } else if (kind === 'j') {
     var sg = pkSig(x), pay = { id: x.id, n: x.n, j: x.j, s: x.s, e: x.e || 0, u: x.u || '', lf: x.lf || '' };
     if (x.sv) pay.sv = x.sv;
+    if (x.j === 'cs' && x.cs && x.cs.p) pay.cp = x.cs.p;
     if (x.e) { pay.t = x.j === 'cs' ? csTxt(x) : (x.t || ''); if (x.td) { pay.td = 1; pay.tc = x.tc || ''; } }
     if (x.rv) pay.bt = 1;          // Cat salah klik dipindah ke Las: waktunya dibatalkan di Laporan Jam Mekanik
     gs('jamKerja', [pay]).then(function (r) {
@@ -1397,7 +1398,8 @@ function vPk() {
 /* ---------- Job Mekanik > Corrective Supporting (CS) ----------
    Pilih Pekerjaan (daftar gulir) -> nama petugas dan jabatan terisi otomatis -> Nomor Mobil diisi manual (Perawatan mojul: Nomor Plat) -> Kerjakan -> tanya "Apakah Anda akan mengerjakan unit ini?" -> waktu mulai.
    Keterangan wajib diisi dulu baru Pengerjaan Selesai. Tetap menunggu approval Group Head / Section Head. Tercatat di Laporan Jam Mekanik (jenis Corrective Supporting). */
-var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambah ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop'];
+var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambah ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop', 'Rebuild Spare part (RO)'];
+function izinBebas(p) { return /^(tambah|tambal) ban$/i.test(String(p || '').trim()); }          /* CS Tambah ban: PKL langsung mulai, tanpa ACC */
 function csModul() { return S.cs.p === CSJ[0]; }
 function csKey(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 /* isian Nomor Mobil / Nomor Plat -> mobil di Master kendaraan: { n, pl, jn } atau null */
@@ -2058,7 +2060,7 @@ function askStart(o, fn) {
   var cur = S.pk.job;
   if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
   S.pkgo = fn; S.pkgoO = o;
-  var pk = isPkl();
+  var pk = isPkl() && !o.free;
   showModal('<div class="sh-head"><b>' + (o.td ? 'Lanjutkan Pekerjaan Tunda' : 'Mulai Pengerjaan') + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(o.n) + '</b> <span class="pill pk-' + o.k + '">' + esc(o.t) + '</span>' +
     '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(meNama()) + '</dd>' + (o.info || '') + '</dl></div>' +
@@ -2171,6 +2173,7 @@ function ckAfterSync(x) {
 function ckAp(x) { return x.e && x.ap ? x.ap : null; }
 function pkCSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e && !x.td ? (x.t || '') : '', x.lf || '', x.e && !x.td && x.pem ? 'P' : ''].join('|'); }
 function pkCPending(x) { return !!x.ck && !x.cf && !x.rv && x.cy !== pkCSig(x); }          /* x.rv: Cat dibatalkan dan armada dipindah ke Las (sudah ditangani server) */
+var TUNDA_CAT = ['Proses dempul', 'Proses Epoxy', 'Belum proses cat'];          /* pilihan saat Tabrak Cat ditunda; tersimpan di Catatan Tunda */
 function pkK(j) { return j.j === 'cs' ? 'cs' : j.j === 'ck' ? 'ck' : (j.j === 'tb' ? 'tb' : (j.j === 'las' ? 'las' : (j.j === 'pem' ? 'pem' : (j.j === 'ki' ? 'ki' : 'teknik')))); }
 /* ---------- Tabrak: foto selesai dari aplikasi klaim (menggantikan isian Tindakan; wajib ada sebelum Pengerjaan Selesai) ---------- */
 function pkFsOf(j) { return j && j.ck && j.ck.fs ? j.ck.fs : []; }
@@ -3502,11 +3505,11 @@ var ACT = {
     var C = S.cs, f = csFind();
     if (!C.p) { toast('Pilih pekerjaan dulu.', true); return; }
     if (!f) { toast((csModul() ? 'Nomor plat' : 'No Mobil') + ' belum benar / tidak ada di Master kendaraan.', true); return; }
-    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p, q: 'Apakah Anda akan mengerjakan unit ini?',
+    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p, free: izinBebas(C.p), q: 'Apakah Anda akan mengerjakan unit ini?',
       info: '<dt>Pekerjaan</dt><dd>' + esc(C.p) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' + (f.jn ? '<dt>Jenis</dt><dd>' + esc(f.jn) + '</dd>' : '') + (f.pl ? '<dt>Nomor Plat</dt><dd>' + esc(f.pl) + '</dd>' : '') },
       function () { csBegin(f); });
   },
-  pkgoyes: function () { var f = S.pkgo, o = S.pkgoO; S.pkgo = null; closeModal(); if (!f) return; if (isPkl()) izGate(o || {}, f); else f(); },
+  pkgoyes: function () { var f = S.pkgo, o = S.pkgoO; S.pkgo = null; closeModal(); if (!f) return; if (isPkl() && !(o && o.free)) izGate(o || {}, f); else f(); },
   izok: function (a) { izDecide(a, true); },
   iztolak: function (a) { izDecide(a, false); },
   izbatal: function () { izStop(true); },
@@ -3533,17 +3536,25 @@ var ACT = {
   pktunda: function () {
     var j = S.pk.job; if (!j || j.e || j.cf) return;
     if (j.ck && kdOf(j) !== 'tb') { var ta0 = $('#pk_t'); if (ta0) j.t = ta0.value; }
+    var cat = !!j.ck && kdOf(j) === 'tb';
     showModal('<div class="sh-head"><b>Tunda Pekerjaan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
       '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
       '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(Date.now() - j.s) + '</dd></dl></div>' +
-      '<label for="pk_tc">Catatan tunda <em>opsional</em></label><textarea id="pk_tc" rows="3" maxlength="200" placeholder="Contoh: menunggu sparepart, lanjut besok"></textarea>' +
+      (cat ? '<div class="pkkt"><label for="pk_tp">Posisi pengerjaan Cat <em>wajib dipilih</em></label><select id="pk_tp"><option value="">Pilih keterangan...</option>' + TUNDA_CAT.map(function (q) { return '<option value="' + esc(q) + '">' + esc(q) + '</option>'; }).join('') + '</select></div>' : '') +
+      '<label for="pk_tc">' + (cat ? 'Catatan tambahan' : 'Catatan tunda') + ' <em>opsional</em></label><textarea id="pk_tc" rows="' + (cat ? 2 : 3) + '" maxlength="' + (cat ? 150 : 200) + '" placeholder="Contoh: menunggu sparepart, lanjut besok"></textarea>' +
       '<div class="pktd-h">Waktu langsung berhenti. Pekerjaan tetap tercatat di Laporan Jam Mekanik dengan status Tunda. Mekanik mana pun yang punya akses boleh meneruskannya; jam kerjanya mulai dari nol.</div>' +
       '<button class="btn full pkbtn pktunda-ok" data-act="pktundaok">' + ic('clock') + ' Tunda Sekarang</button>');
-    setTimeout(function () { var f = $('#pk_tc'); if (f) f.focus(); }, 60);
+    setTimeout(function () { var f = $(cat ? '#pk_tp' : '#pk_tc'); if (f) f.focus(); }, 60);
   },
   pktundaok: function () {
     var j = S.pk.job; if (!j || j.e || j.cf) return;
-    var ta = $('#pk_tc'); j.tc = (ta ? ta.value : '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    var ta = $('#pk_tc'), tx = (ta ? ta.value : '').replace(/\s+/g, ' ').trim();
+    if (j.ck && kdOf(j) === 'tb') {          /* Tabrak Cat: posisi pengerjaan wajib dipilih (Proses dempul / Proses Epoxy / Belum proses cat) */
+      var sp = $('#pk_tp'), pv = sp ? sp.value : '';
+      if (TUNDA_CAT.indexOf(pv) < 0) { toast('Pilih posisi pengerjaan Cat dulu.', true); if (sp) { sp.classList.add('bad'); sp.focus(); } return; }
+      tx = pv + (tx ? ': ' + tx : '');
+    }
+    j.tc = tx.slice(0, 200);
     j.e = Date.now(); j.td = 1; j.ap = null; pkJobSave(); closeModal(); pkShow(); pkSync(); toast('Pekerjaan ditunda, waktu berhenti');
   },
   pkcf: function () { ACT.pknew(); },
