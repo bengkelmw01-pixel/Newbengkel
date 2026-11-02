@@ -1274,7 +1274,7 @@ function pkJobSave() {
 /* kirim ke sheet 'Laporan Jam Mekanik': tiap pengerjaan dikirim lengkap (id + jam mulai/selesai + pekerjaan tambahan); server mencari barisnya lewat id, jadi aman diulang.
    Approval TIDAK dikirim dari HP mekanik: hanya Group Head / Section Head (akun Approval) yang menyetujui; bila server menjawab locked + ap, pekerjaan ini sudah disetujui.
    Form NOMO (FOKUS) dikirim terpisah ke sheet 'FOKUS Pengukuran' setelah tombol Simpan. */
-function pkSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e ? (x.t || '') : '', x.lf || '', x.rv ? 'B' : ''].join('|'); }
+function pkSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e ? (x.t || '') : '', x.lf || '', x.rv ? 'B' : ''].join('|') + (x.bk ? '|K' + x.bk : ''); }
 /* cf = pekerjaan ini sudah dipegang user lain (ditolak server): tidak dicatat dan tidak dikirim ulang */
 function pkPending(x) { return !x.cf && !(x.ok && x.sg === pkSig(x)); }
 function pkFPending(x) { return !x.cf && !!x.fs && x.fy !== x.fs; }
@@ -1322,6 +1322,7 @@ function pkSync() {
   if (kind === 'c') {
     var cs = pkCSig(x), cc = x.ck, kd = kdOf(x);
     var pay = { k: cc.k, d: cc.d, id: x.id, n: x.n, n0: cc.n0, tg: cc.jm, kl: cc.kl, s: x.s, e: x.e || 0, t: x.t || '', u: x.u || '', td: x.td ? 1 : 0, tc: x.tc || '', lf: x.lf || '' };
+    if (x.bk) pay.bk = x.bk;          // waktu istirahat yang dipause (ms): dikurangkan dari Total Menit
     if (kd === 'tb') { pay.rg = cc.rg || ''; pay.fo = cc.fo || []; pay.fs = cc.fs || []; pay.pem = x.e && !x.td && x.pem ? 1 : 0; }
     else if (kd === 'pem' || kd === 'las') { pay.rg = cc.rg || ''; pay.fo = cc.fo || []; pay.cs = cc.cs || []; }
     else { pay.nip = cc.nip; pay.nm = cc.nm; }
@@ -1338,6 +1339,7 @@ function pkSync() {
     if (x.j === 'cs' && x.cs && x.cs.p) pay.cp = x.cs.p;
     if (x.e) { pay.t = x.j === 'cs' ? csTxt(x) : (x.t || ''); if (x.td) { pay.td = 1; pay.tc = x.tc || ''; } }
     if (x.rv) pay.bt = 1;          // Cat salah klik dipindah ke Las: waktunya dibatalkan di Laporan Jam Mekanik
+    if (x.bk) pay.bk = x.bk;          // waktu istirahat yang dipause (ms): dikurangkan dari Total Menit
     gs('jamKerja', [pay]).then(function (r) {
       if (r && r.ok === false && r.conflict) { x.cf = r.conflict; x.err = ''; phPurge(x); tolak(); }
       else if (r && r.locked && r.ap) { apApply(x, r.ap, true); x.ok = 1; x.sg = pkSig(x); x.err = ''; }
@@ -1366,12 +1368,14 @@ window.addEventListener('online', pkSync);
 function pkP2(n) { return n < 10 ? '0' + n : '' + n; }
 function pkDur(ms) { var s = Math.max(0, Math.floor(ms / 1000)); return pkP2(Math.floor(s / 3600)) + ':' + pkP2(Math.floor(s % 3600 / 60)) + ':' + pkP2(s % 60); }
 function pkDmy(t) { var d = new Date(t); return pkP2(d.getDate()) + '/' + pkP2(d.getMonth() + 1) + '/' + d.getFullYear(); }
+/* lama kerja bersih (ms) sampai waktu t: dikurangi waktu istirahat yang dipause (j.bk), ditambah jam sebelumnya bila meneruskan tunda istirahat (j.pre) */
+function pkEl(j, t) { return Math.max(0, t - j.s - (j.bk || 0)) + (j.pre || 0); }
 function pkTimeHtml(j) {
   if (j.cf) return '<span class="pkend"><span class="pkl"><b>Tidak dicatat</b></span></span>';
   if (j.rv) return '<span class="pkend td"><span class="pkl"><b>Dibatalkan</b> (waktu tidak dihitung)</span></span>';
-  if (!j.e) return '<span class="pkrun"><i class="pkdot"></i>Berjalan <b>' + pkDur(Date.now() - j.s) + '</b></span>';
-  if (j.td) return '<span class="pkend td"><span class="pkl">Tunda <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(j.e - j.s) + '</b></span></span>';
-  return '<span class="pkend"><span class="pkl">Selesai <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(j.e - j.s) + '</b></span></span>';
+  if (!j.e) return '<span class="pkrun"><i class="pkdot"></i>Berjalan <b>' + pkDur(pkEl(j, Date.now())) + '</b></span>';
+  if (j.td) return '<span class="pkend td"><span class="pkl">Tunda <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(pkEl(j, j.e)) + '</b></span></span>';
+  return '<span class="pkend"><span class="pkl">Selesai <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(pkEl(j, j.e)) + '</b></span></span>';
 }
 function pkTick() {
   var j = S.pk.job; if (!j || j.e || j.cf) return;
@@ -1379,6 +1383,86 @@ function pkTick() {
   if (el) el.innerHTML = pkTimeHtml(j);
 }
 setInterval(pkTick, 250);
+
+/* ---------- Jam istirahat (mekanik dan PKL): 12:00-13:00 (shift pagi 07:00-15:00) dan 04:00-05:00 (shift 3 23:00-07:00) ----------
+   5 menit sebelum istirahat muncul pertanyaan: pekerjaan ditunda? Jika ya, pekerjaan menjadi Tunda ("Tunda karena istirahat") dan jam berhenti.
+   Tidak dijawab = ditunda otomatis tepat saat istirahat mulai (juga bila aplikasi sedang ditutup). "Tetap lanjut kerja" = jam terus berjalan.
+   Sesudah istirahat muncul pertanyaan: dilanjutkan? Jika ya, pekerjaan yang SAMA berjalan lagi; jam meneruskan yang tadi (waktu istirahat dikurangkan: j.bk).
+   Corrective Supporting tidak ikut (CS memang tidak bisa ditunda). */
+var BRK_TC = 'Tunda karena istirahat';
+var BRK_W = [[4, 0, 5, 0], [12, 0, 13, 0]];
+var BRK_PRE = 5 * 60000;
+var BRK = { ask: 0, rs: '' };
+function brkWinAfter(from) {          /* jendela istirahat berikutnya yang MULAI sesudah waktu `from` (ms): { s, e } */
+  var d0 = new Date(from), k, best = null;
+  for (k = 0; k < 9; k++) BRK_W.forEach(function (w) {
+    var a = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + k, w[0], w[1]).getTime(), b = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + k, w[2], w[3]).getTime();
+    if (a > from && (!best || a < best.s)) best = { s: a, e: b };
+  });
+  return best;
+}
+function brkFrom(j) { return Math.max(j.s, j.rs || 0, j.bka || 0); }
+function brkOurs() { return !!($('#brk_ask') || $('#brk_rs')); }
+function brkModalOpen() { var m = $('#modal'); return !!m && m.classList.contains('show'); }
+function brkCd(ms) { var s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return (m ? m + ' menit ' : '') + (s % 60) + ' detik'; }
+function brkHm(w) { return pkP2(new Date(w.s).getHours()) + ':' + pkP2(new Date(w.s).getMinutes()) + ' - ' + pkP2(new Date(w.e).getHours()) + ':' + pkP2(new Date(w.e).getMinutes()); }
+function brkTick() {
+  var j = S.pk.job; if (!j || j.cf || j.rv || j.ap || j.j === 'cs' || !S.me) return;
+  var now = Date.now();
+  if (!j.e) {
+    var w = brkWinAfter(brkFrom(j)); if (!w) return;
+    if (now >= w.s) { brkPause(j, true); return; }          /* tidak dijawab sampai istirahat mulai: ditunda otomatis tepat jam istirahat */
+    if (now >= w.s - BRK_PRE) {
+      if (BRK.ask === w.s) { var cd = $('#brk_cd'); if (cd) cd.textContent = brkCd(w.s - now); }
+      else if (!brkModalOpen()) brkAsk(j, w);
+    }
+  } else if (j.td && j.brk && j.bwe && now >= j.bwe && BRK.rs !== j.id + ':' + j.bwe && !brkModalOpen()) brkAskResume(j);
+}
+setInterval(brkTick, 1000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) brkTick(); });
+function brkAsk(j, w) {
+  BRK.ask = w.s;
+  showModal('<div class="sh-head"><b id="brk_ask">Sebentar lagi jam istirahat</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
+    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Jam istirahat</dt><dd>' + brkHm(w) + '</dd><dt>Mulai dalam</dt><dd id="brk_cd">' + brkCd(w.s - Date.now()) + '</dd></dl></div>' +
+    '<div class="pkq">Apakah pekerjaan ditunda?<small>Jika ditunda, pekerjaan tercatat &quot;' + BRK_TC + '&quot; dan jam berhenti. Setelah istirahat Anda ditanya untuk melanjutkan, jam kerja meneruskan yang tadi. Jika tidak dijawab, pekerjaan ditunda otomatis saat istirahat mulai.</small></div>' +
+    '<button class="btn full pkbtn pktunda-ok" data-act="brktunda">' + ic('clock') + ' Tunda karena istirahat</button>' +
+    '<button class="btn ghost full pkbtn" data-act="brklanjut">Tetap lanjut kerja</button>');
+}
+function brkPause(j, auto) {
+  if (!j || j.e || j.cf) return;
+  var w = brkWinAfter(brkFrom(j)); if (!w) return;
+  var at = auto ? w.s : Date.now();
+  if (at <= j.s) at = j.s + 1000;
+  j.e = at; j.td = 1; j.tc = BRK_TC; j.brk = 1; j.bwe = w.e; j.ap = null;
+  if (brkOurs()) closeModal();
+  pkJobSave(); pkShow(); pkSync();
+  toast(auto ? 'Jam istirahat: pekerjaan #' + j.n + ' ditunda otomatis, waktu berhenti' : 'Pekerjaan ditunda karena istirahat, waktu berhenti');
+}
+function brkAskResume(j) {
+  BRK.rs = j.id + ':' + j.bwe;
+  showModal('<div class="sh-head"><b id="brk_rs">Jam istirahat selesai</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
+    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Jam kerja tadi</dt><dd>' + pkDur(pkEl(j, j.e)) + '</dd></dl></div>' +
+    '<div class="pkq">Apakah pekerjaan dilanjutkan?<small>Jika dilanjutkan, jam kerja meneruskan yang tadi (waktu istirahat tidak dihitung).</small></div>' +
+    '<button class="btn full pkbtn pkdone" data-act="brkresume">' + ic('wrench') + ' Ya, Lanjutkan</button>' +
+    '<button class="btn ghost full pkbtn" data-act="closemodal">Nanti</button>');
+  if (S.view === 'jobpk') pkShow();
+}
+function brkResume(j) {
+  if (!j || !j.td || !j.brk || j.ap || j.cf) return;
+  var now = Date.now();
+  j.bk = (j.bk || 0) + Math.max(0, now - j.e); j.rs = now; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.brk = 0; j.bwe = 0;
+  if (brkOurs()) closeModal();
+  pkJobSave(); pkShow(); pkSync(); toast('Pekerjaan dilanjutkan, jam kerja meneruskan yang tadi');
+}
+/* bagian bawah halaman pekerjaan yang ditunda karena istirahat (dipakai pkShow dan pkShowCk); back = tombol kembali / pekerjaan baru */
+function brkActs(job, back) {
+  var over = !!job.bwe && Date.now() >= job.bwe;
+  return '<div class="pkfin td">' + ic('clock') + ' Pekerjaan ditunda karena jam istirahat. Waktu berhenti.</div>' +
+    '<div class="pktd-h">' + (over ? 'Jam istirahat sudah selesai. Tekan Lanjutkan: jam kerja meneruskan yang tadi.' : 'Istirahat sampai <b>' + hm(job.bwe) + '</b>. Setelah itu Anda ditanya untuk melanjutkan; jam kerja meneruskan yang tadi.') + '</div>' +
+    '<button class="btn full pkbtn pkdone" id="brk_go" data-act="brkresume">' + ic('wrench') + ' ' + (over ? 'Lanjutkan Pekerjaan' : 'Lanjutkan Sekarang') + '</button>' + back;
+}
 
 function vPk() {
   var p = S.pk;
@@ -1530,11 +1614,12 @@ function tdInner() {
   if (!R.length) return !can('teknik') && !can('ki') ? '<div class="empty">' + (S.td.rows ? 'Tidak ada pekerjaan tunda saat ini.' : 'Memuat pekerjaan tunda...') + '</div>' : '';
   return '<div class="tdl"><div class="tdh">' + ic('clock') + ' Pekerjaan Tunda <b>' + R.length + '</b></div>' + R.map(function (r) {
     var m = S.mi[r.n] || {}, p = isoParts(r.d);
+    var bm = r.tc === BRK_TC, mm = bm && r.cm != null ? r.cm : r.m;
     return '<div class="tdc"><div class="tdc-1">' + nchip(r.n) + '<span class="pill pk-' + r.j + '">' + PKJ[r.j] + '</span></div>' +
-      '<small>Ditunda oleh <b>' + esc(r.nm || '-') + '</b> &middot; ' + esc(r.e || '-') + (r.d ? ' &middot; ' + p.d + ' ' + MON[p.m - 1] : '') + (r.m != null ? ' &middot; sudah ' + jamTxt(r.m) : '') + (m.j ? ' &middot; ' + esc(m.j) : '') + '</small>' +
+      '<small>Ditunda oleh <b>' + esc(r.nm || '-') + '</b> &middot; ' + esc(r.e || '-') + (r.d ? ' &middot; ' + p.d + ' ' + MON[p.m - 1] : '') + (mm != null ? ' &middot; sudah ' + jamTxt(mm) : '') + (m.j ? ' &middot; ' + esc(m.j) : '') + '</small>' +
       (r.tc ? '<div class="tdn"><small>Catatan tunda</small><br>' + esc(r.tc) + '</div>' : '') +
       (r.fk ? '<div class="tdfk">' + ic('check', 'sm') + ' Form Fokus sudah tersimpan' + (r.fk !== '-' ? ' (diisi ' + esc(r.fk) + ')' : '') + '. Tidak perlu diisi lagi.</div>' : '') +
-      (can(r.j) ? '<button class="btn" data-act="pkcont" data-a="' + esc(r.id) + '">' + ic('wrench', 'sm') + ' Lanjutkan (jam mulai dari nol)</button>' : '<div class="tdvo">' + ic('search', 'sm') + ' Hanya melihat</div>') + '</div>';
+      (can(r.j) ? '<button class="btn" data-act="pkcont" data-a="' + esc(r.id) + '">' + ic('wrench', 'sm') + (bm ? ' Lanjutkan (jam kerja meneruskan)' : ' Lanjutkan (jam mulai dari nol)') + '</button>' : '<div class="tdvo">' + ic('search', 'sm') + ' Hanya melihat</div>') + '</div>';
   }).join('') + '</div>';
 }
 function tdUi() { var b = $('#pk_td'); if (b && S.view === 'jobpk' && !S.pk.job) { b.innerHTML = tdInner(); pkListUi(); } }
@@ -1557,6 +1642,7 @@ function pkSvCode(n) {
 function pkBegin(n, jn, lf, td) {
   var t0 = Date.now();
   S.pk.job = { id: 'J' + t0 + Math.random().toString(36).slice(2, 5), n: n, j: jn, s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: meNip(), un: meNama(), cf: '' };
+  if (td && td.tc === BRK_TC) S.pk.job.pre = (td.cm != null ? td.cm : (td.m || 0)) * 60000;          /* meneruskan tunda istirahat: jam kerja meneruskan yang tadi (hanya tampilan; Laporan Jam tetap satu baris per sesi) */
   if (jn === 'teknik') { var sv0 = pkSvCode(n); if (sv0) S.pk.job.sv = sv0; }          /* Kode Servis (S12) dikirim ke Laporan Jam Mekanik: dasar barang Reservasi */
   if (jn === 'teknik' && lf && td && td.fk) { S.pk.job.fcl = lf; S.pk.job.fcn = td.fk === '-' ? '' : td.fk; }          /* Form Fokus pekerjaan tunda sudah tersimpan: dibawa otomatis, tidak diisi ulang */
   pkJobSave(); renderShell(); pkSync(); fkCarry(S.pk.job);
@@ -1588,7 +1674,7 @@ function fkCarryHtml(j) {          /* keterangan di halaman pekerjaan: Form Foku
   return '<div class="pkfkc">' + ic('check', 'sm') + '<span>' + (j.fby ? 'Form Fokus sudah tersimpan, diisi oleh <b>' + esc(j.fcn) + '</b>. Anda tidak perlu mengisi lagi. Tekan tombol Form Fokus bila ingin melihat atau merevisi.'
     : 'Form Fokus sudah direvisi dan tersimpan (awalnya diisi oleh <b>' + esc(j.fcn) + '</b>).') + '</span></div>';
 }
-function pkLfHtml(j) { return j.lfi ? '<div class="pklf">Meneruskan pekerjaan tunda dari <b>' + esc(j.lfi.nm || '-') + '</b>' + (j.lfi.m != null ? ' (sudah ' + jamTxt(j.lfi.m) + ')' : '') + '. Jam kerja Anda mulai dari nol.</div>' : ''; }
+function pkLfHtml(j) { return j.lfi && j.pre ? '<div class="pklf">Meneruskan pekerjaan yang ditunda karena istirahat (sudah ' + jamTxt(Math.round(j.pre / 60000)) + '). Jam kerja meneruskan yang tadi.</div>' : j.lfi ? '<div class="pklf">Meneruskan pekerjaan tunda dari <b>' + esc(j.lfi.nm || '-') + '</b>' + (j.lfi.m != null ? ' (sudah ' + jamTxt(j.lfi.m) + ')' : '') + '. Jam kerja Anda mulai dari nol.</div>' : ''; }
 function pkCfHtml(j) {
   return '<div class="pkcf">' + ic('warn') + '<div><b>Pekerjaan ini sudah dipegang pengguna lain</b><small>' + esc(j.cf) + '</small><small>Pengerjaan Anda tidak dicatat di laporan.</small></div></div>' +
     '<button class="btn full pkbtn" data-act="pkcf">Tutup</button>';
@@ -1620,6 +1706,8 @@ function pkShow() {
     (r ? svcRows(r, m, false) : '<dt>Jenis</dt><dd>' + esc(m.j || '-') + '</dd><dt>Data</dt><dd class="pknone">Belum ada data ' + jt + ' untuk mobil ini (daftar ' + jt + ' hanya memuat mobil dengan Selisih KM di atas ' + lab + ').</dd>');
   var body;
   if (job.cf) body = pkCfHtml(job);
+  else if (job.td && job.brk) body = '<div class="pkx ro"><span>Catatan Tunda</span><p>' + esc(job.tc || '-') + '</p></div>' +
+    brkActs(job, '<button class="btn ghost full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>');
   else if (job.td) body = '<div class="pkx ro"><span>Catatan Tunda</span><p>' + esc(job.tc || '-') + '</p></div>' +
     '<div class="pkfin td">' + ic('clock') + ' Pekerjaan ditunda. Waktu berhenti.</div><div class="pktd-h">Bisa dilanjutkan mekanik mana pun yang punya akses. Jam kerjanya mulai dari nol.</div>' +
     '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' +
@@ -2065,7 +2153,7 @@ function askStart(o, fn) {
     '<div class="pkapsum"><b class="no">#' + esc(o.n) + '</b> <span class="pill pk-' + o.k + '">' + esc(o.t) + '</span>' +
     '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(meNama()) + '</dd>' + (o.info || '') + '</dl></div>' +
     '<div class="pkq">' + (o.td ? 'Apakah Anda akan meneruskan pekerjaan tunda ini?' : (o.q || 'Apakah Anda akan mengerjakan armada ini?')) +
-    '<small>' + (pk ? 'Anda perlu ACC dari Section Head / Group Head atau Devi dulu. Waktu mulai berjalan setelah disetujui.' : o.td ? 'Jam kerja Anda mulai dari nol setelah menekan OK.' : 'Waktu mulai berjalan setelah Anda menekan OK.') + '</small></div>' +
+    '<small>' + (pk ? 'Anda perlu ACC dari Section Head / Group Head atau Devi dulu. Waktu mulai berjalan setelah disetujui.' : o.brk ? 'Jam kerja meneruskan yang tadi setelah menekan OK.' : o.td ? 'Jam kerja Anda mulai dari nol setelah menekan OK.' : 'Waktu mulai berjalan setelah Anda menekan OK.') + '</small></div>' +
     '<div class="pkyn"><button class="btn ghost" data-act="closemodal">Batal</button><button class="btn pkdone" id="pk_go" data-act="pkgoyes">' + ic(pk ? 'shield' : 'check') + (pk ? ' Minta ACC' : ' OK, Mulai') + '</button></div>');
   setTimeout(function () { var b = $('#pk_go'); if (b) b.focus(); }, 60);
 }
@@ -2171,7 +2259,7 @@ function ckAfterSync(x) {
 }
 /* approval hanya tampilan (diisi dari jawaban server): HP mekanik tidak mengirim approval */
 function ckAp(x) { return x.e && x.ap ? x.ap : null; }
-function pkCSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e && !x.td ? (x.t || '') : '', x.lf || '', x.e && !x.td && x.pem ? 'P' : ''].join('|'); }
+function pkCSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e && !x.td ? (x.t || '') : '', x.lf || '', x.e && !x.td && x.pem ? 'P' : ''].join('|') + (x.bk ? '|K' + x.bk : ''); }
 function pkCPending(x) { return !!x.ck && !x.cf && !x.rv && x.cy !== pkCSig(x); }          /* x.rv: Cat dibatalkan dan armada dipindah ke Las (sudah ditangani server) */
 var TUNDA_CAT = ['Proses dempul', 'Proses Epoxy', 'Belum proses cat'];          /* pilihan saat Tabrak Cat ditunda; tersimpan di Catatan Tunda */
 function pkK(j) { return j.j === 'cs' ? 'cs' : j.j === 'ck' ? 'ck' : (j.j === 'tb' ? 'tb' : (j.j === 'las' ? 'las' : (j.j === 'pem' ? 'pem' : (j.j === 'ki' ? 'ki' : 'teknik')))); }
@@ -2272,7 +2360,7 @@ function pkPemNote() {
 /* tombol Pengerjaan Selesai pada Cat: tanya dulu "Armada ini membutuhkan PEM?" */
 function pkAskPem(j) {
   showModal('<div class="sh-head"><b>Pengerjaan Cat Selesai</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Lama</dt><dd>' + pkDur(Date.now() - j.s) + '</dd></dl></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Lama</dt><dd>' + pkDur(pkEl(j, Date.now())) + '</dd></dl></div>' +
     '<div class="pkq">Armada ini membutuhkan PEM?<small>Jika Ya, waktu Cat berhenti dan armada ini masuk ke daftar PEM (Job Mekanik &gt; Tabrak &gt; PEM). Jika Tidak, pengerjaan selesai seperti biasa.</small></div>' +
     '<div class="pkyn"><button class="btn ghost" data-act="pkpem" data-a="0">Tidak</button><button class="btn pkdone" data-act="pkpem" data-a="1">' + ic('check') + ' Ya, perlu PEM</button></div>');
 }
@@ -2303,6 +2391,10 @@ function pkShowCk(el, job) {
     mid = '';
     acts = '<div class="pkfin td">' + ic('wrench') + ' Armada dikirim ke Las / Ketok. Waktu Cat berhenti.</div><div class="pktd-h">Armada ini sekarang ada di menu Las. Waktu Cat yang salah klik tidak dihitung. Cat bisa dikerjakan lagi setelah Las selesai.</div>' +
       '<button class="btn full pkbtn" data-act="pknew">' + ic('wrench') + ' Kembali ke Daftar ' + kdLbl(kd) + '</button>';
+  }
+  else if (job.td && job.brk) {
+    mid = '<div class="pkx ro"><span>Catatan Tunda</span><p>' + esc(job.tc || '-') + '</p></div>';
+    acts = brkActs(job, '<button class="btn ghost full pkbtn" data-act="pknew">' + ic('wrench') + ' Kembali ke Daftar ' + kdLbl(kd) + '</button>');
   }
   else if (job.td) {
     mid = '<div class="pkx ro"><span>Catatan Tunda</span><p>' + esc(job.tc || '-') + '</p></div>';
@@ -3520,7 +3612,8 @@ var ACT = {
     if (!S.mi[n]) { toast('No Mobil ' + n + ' tidak ditemukan di Master kendaraan', true); return; }
     var td = tdFor(n, jn);                       // ada pekerjaan tunda untuk mobil dan jenis yang sama: otomatis meneruskan, jam mulai dari nol
     var m = S.mi[n] || {};
-    askStart({ n: n, k: jn, t: PKJ[jn], td: !!td, info: (m.j ? '<dt>Jenis</dt><dd>' + esc(m.j) + '</dd>' : '') + (td ? '<dt>Ditunda oleh</dt><dd>' + esc(td.nm || 'mekanik lain') + '</dd>' : '') },
+    var bmine = !!td && td.tc === BRK_TC && String(td.nip || '').toLowerCase() === String(meNip()).toLowerCase();          /* tunda istirahat milik sendiri: PKL tanpa ACC baru */
+    askStart({ n: n, k: jn, t: PKJ[jn], td: !!td, brk: bmine, free: bmine, info: (m.j ? '<dt>Jenis</dt><dd>' + esc(m.j) + '</dd>' : '') + (td ? '<dt>Ditunda oleh</dt><dd>' + esc(td.nm || 'mekanik lain') + '</dd>' : '') },
       function () { pkBegin(n, jn, td ? td.id : '', td); });
   },
   pkcont: function (a) {
@@ -3530,7 +3623,8 @@ var ACT = {
     if (!can(r.j)) { toast('Akun Anda tidak punya akses ke ' + PKJ[r.j] + '.', true); return; }
     if (!S.mi[r.n]) { toast('No Mobil ' + r.n + ' tidak ditemukan di Master kendaraan', true); return; }
     var m = S.mi[r.n] || {};
-    askStart({ n: r.n, k: r.j, t: PKJ[r.j], td: true, info: (m.j ? '<dt>Jenis</dt><dd>' + esc(m.j) + '</dd>' : '') + '<dt>Ditunda oleh</dt><dd>' + esc(r.nm || 'mekanik lain') + '</dd>' },
+    var bmine = r.tc === BRK_TC && String(r.nip || '').toLowerCase() === String(meNip()).toLowerCase();          /* tunda istirahat milik sendiri: PKL tanpa ACC baru, jam meneruskan */
+    askStart({ n: r.n, k: r.j, t: PKJ[r.j], td: true, brk: bmine, free: bmine, info: (m.j ? '<dt>Jenis</dt><dd>' + esc(m.j) + '</dd>' : '') + '<dt>Ditunda oleh</dt><dd>' + esc(r.nm || 'mekanik lain') + '</dd>' },
       function () { pkBegin(r.n, r.j, r.id, r); });
   },
   pktunda: function () {
@@ -3539,7 +3633,7 @@ var ACT = {
     var cat = !!j.ck && kdOf(j) === 'tb';
     showModal('<div class="sh-head"><b>Tunda Pekerjaan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
       '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
-      '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(Date.now() - j.s) + '</dd></dl></div>' +
+      '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(pkEl(j, Date.now())) + '</dd></dl></div>' +
       (cat ? '<div class="pkkt"><label for="pk_tp">Posisi pengerjaan Cat <em>wajib dipilih</em></label><select id="pk_tp"><option value="">Pilih keterangan...</option>' + TUNDA_CAT.map(function (q) { return '<option value="' + esc(q) + '">' + esc(q) + '</option>'; }).join('') + '</select></div>' : '') +
       '<label for="pk_tc">' + (cat ? 'Catatan tambahan' : 'Catatan tunda') + ' <em>opsional</em></label><textarea id="pk_tc" rows="' + (cat ? 2 : 3) + '" maxlength="' + (cat ? 150 : 200) + '" placeholder="Contoh: menunggu sparepart, lanjut besok"></textarea>' +
       '<div class="pktd-h">Waktu langsung berhenti. Pekerjaan tetap tercatat di Laporan Jam Mekanik dengan status Tunda. Mekanik mana pun yang punya akses boleh meneruskannya; jam kerjanya mulai dari nol.</div>' +
@@ -3558,6 +3652,13 @@ var ACT = {
     j.e = Date.now(); j.td = 1; j.ap = null; pkJobSave(); closeModal(); pkShow(); pkSync(); toast('Pekerjaan ditunda, waktu berhenti');
   },
   pkcf: function () { ACT.pknew(); },
+  brktunda: function () { var j = S.pk.job; closeModal(); brkPause(j, false); },
+  brklanjut: function () {
+    var j = S.pk.job, w = j && !j.e ? brkWinAfter(brkFrom(j)) : null;
+    if (w) { j.bka = w.s; pkJobSave(); }
+    closeModal(); toast('Tetap lanjut kerja, jam terus berjalan');
+  },
+  brkresume: function () { brkResume(S.pk.job); },
   nojob: function (a) { toast('Akun Anda tidak punya akses ke ' + a + '.', true); },
   pkdone: function () {
     var j = S.pk.job; if (!j || j.e || j.cf) return;
@@ -3682,7 +3783,7 @@ var ACT = {
   catrevisi: function () {
     var j = S.pk.job; if (!j || !j.ck || kdOf(j) !== 'tb' || j.e || j.td || j.cf) return;
     showModal('<div class="sh-head"><b>Kirim ke Las / Ketok</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-      '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(Date.now() - j.s) + '</dd></dl></div>' +
+      '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(pkEl(j, Date.now())) + '</dd></dl></div>' +
       '<div class="pkq">Salah klik? Armada ini harus di Las / Ketok dulu?<small>Pekerjaan Cat dihentikan dan waktunya tidak dihitung di Laporan Jam Mekanik. Armada pindah ke menu Las. Cat bisa dikerjakan lagi setelah Las selesai.</small></div>' +
       '<div class="pkyn"><button class="btn ghost" data-act="closemodal">Batal</button><button class="btn pkdone" id="cr_go" data-act="catrevisiok">' + ic('wrench') + ' Ya, kirim ke Las</button></div>');
   },
@@ -3795,6 +3896,7 @@ var ACT = {
     var kd = kdArg(b), r = ckRowOf(kd, a); if (!r) return;
     if (!canKd(kd)) { toast('Akun Anda tidak punya akses ke ' + KDC[kd].t + '.', true); return; }
     var s = ckSt(kd, r);
+    if (s.s === 'tunda' && s.mine && s.job && s.job.brk && S.pk.job === s.job) { go('jobpk'); return; }          // tunda istirahat milik sendiri: dilanjutkan dari halaman pekerjaan (jam meneruskan)
     if (s.s === 'tunda') {                       // meneruskan pekerjaan tunda: sesi baru, jam mulai dari nol
       var cu = S.pk.job;
       if (cu && !cu.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cu.n + ' yang sedang berjalan.', true); return; }
