@@ -493,6 +493,57 @@ body.on-nomo .toast{bottom:104px}
 .lj-ap{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;flex-wrap:wrap}.lj-ap.ok{color:#0b8a5f}.lj-ap.wait{color:#c2410c}.lj-ap .ic{width:15px;height:15px}
 .lj-ht2{margin-top:12px;padding:10px 12px;background:#e6eefc;border-radius:14px;font-weight:800;color:#0b1f9a;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 @media (min-width:700px){.lj-head img{max-width:190px}.lj-dl{font-size:17px}}
+/* beranda: papan Monitoring Service Bengkel */
+.pad.mn{max-width:1320px;padding:12px}
+.mn-hd{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#0b1f9a,#1a4fd8);color:#fff;border-radius:18px;padding:10px 12px;margin-bottom:12px;box-shadow:0 6px 18px rgba(11,31,154,.25)}
+.mn-hd img{width:20%;max-width:150px;height:auto;flex:none;border-radius:12px;background:#fff}
+.mn-ht{flex:1;min-width:0}
+.mn-ht h1{margin:0;font-size:clamp(14px,4.2vw,26px);font-weight:900;line-height:1.15;letter-spacing:.2px}
+.mn-ht p{margin:4px 0 0;font-size:clamp(10.5px,2.9vw,15px);font-weight:700;opacity:.95}
+.mn-clk{text-align:right;flex:none}
+.mn-clk small{display:block;font-size:clamp(8.5px,2.5vw,12px);font-weight:800;letter-spacing:.6px;opacity:.92}
+.mn-clk b{display:block;font-size:clamp(19px,6.2vw,38px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1}
+.mn-live{display:inline-block;width:8px;height:8px;border-radius:50%;background:#3dffa0;margin-right:5px;vertical-align:middle;animation:mnp 1.6s infinite}
+@keyframes mnp{50%{opacity:.25}}
+.mn-body{display:flex;flex-direction:column;gap:12px}
+.mn-l,.mn-r{display:flex;flex-direction:column;gap:12px;min-width:0}
+.mn-tiles{order:-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mn-tile{border-radius:14px;color:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:3px;min-width:0}
+.mn-tile small{font-size:clamp(10px,2.8vw,12.5px);font-weight:800;letter-spacing:.4px;opacity:.95}
+.mn-tile b{font-size:clamp(26px,8vw,40px);font-weight:900;line-height:1}
+.mn-tn{background:#0b1f6b}.mn-tg{background:#0d8f5a}.mn-to{background:#e8590c}.mn-tq{background:#1a4fd8}
+.mn-pn{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 3px 12px rgba(26,79,216,.07)}
+.mn-pn>h3{margin:0;padding:8px 10px;color:#fff;font-size:clamp(11.5px,3.2vw,15px);font-weight:900;letter-spacing:.6px;text-align:center}
+.mn-red>h3{background:#c8102e}.mn-blu>h3{background:#1a4fd8}.mn-grn>h3{background:#0d8f5a}
+.mn-t{width:100%;border-collapse:collapse;table-layout:fixed;font-size:clamp(9.5px,2.6vw,13.5px)}
+.mn-t th{background:#eef2fb;color:#0b1f9a;font-weight:800;padding:6px 1px;text-align:center;border-bottom:1px solid var(--line);line-height:1.15;overflow-wrap:break-word}
+.mn-t td{padding:6px 1px;text-align:center;border-bottom:1px solid #eef1f8;overflow-wrap:break-word;line-height:1.2;vertical-align:middle}
+.mn-t tr:last-child td{border-bottom:0}
+.mn-t td.l{text-align:left;padding-left:5px}
+.mn-t td.mn-em{color:var(--muted);padding:16px 8px}
+.mn-car{font-weight:800}
+.mn-t td small{display:block;color:var(--muted);font-size:.86em}
+.mn-st{display:inline-block;padding:3px 4px;border-radius:999px;font-weight:800;font-size:.92em;line-height:1.15}
+.mn-g{background:#d8f5e6;color:#0a7a4c}.mn-o{background:#ffe9d2;color:#c2410c}.mn-v{background:#ece8ff;color:#5b21f0}
+.mn-chips{display:flex;flex-wrap:wrap;gap:6px;padding:10px}
+.mn-chip{display:inline-flex;flex-direction:column;align-items:center;min-width:76px;padding:6px 10px;border-radius:10px;font-weight:800;background:#eef2fb;color:#0b1f9a;font-size:13.5px;line-height:1.2}
+.mn-chip small{font-size:10.5px;font-weight:700;color:var(--muted)}
+.mn-chip.tn{background:#ece8ff;color:#5b21f0}
+.mn-chips .mn-em{width:100%;text-align:center;color:var(--muted);font-weight:600;padding:8px 0}
+.mn-info{background:#c8102e;color:#fff;border-radius:14px;overflow:hidden}
+.mn-info h3{margin:0;padding:8px 12px;font-size:clamp(12px,3.3vw,15px);font-weight:900;letter-spacing:.6px;background:rgba(0,0,0,.18)}
+.mn-info p{margin:0;padding:7px 12px;font-size:clamp(11.5px,3.3vw,14px);line-height:1.3;border-top:1px solid rgba(255,255,255,.18)}
+.mn-info p .t{font-weight:800;margin-right:5px;opacity:.9}
+.mn-ft{text-align:center;color:var(--muted);font-size:12px;margin:14px 0 26px}
+.mn-ft a{color:var(--blue);font-weight:700;cursor:pointer}
+.mn-ft.bad{color:var(--red)}
+@media (min-width:900px){
+  .mn-body{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start}
+  .mn-l{grid-column:1;grid-row:1}.mn-r{grid-column:2;grid-row:1}
+  .mn-tiles{order:0;grid-column:1;grid-row:2;grid-template-columns:repeat(4,1fr)}
+  .mn-info{grid-column:2;grid-row:2}
+}
+
 
 /* Pekerjaan Tambahan, approval pengawas, badge NOMO */
 .pkx{margin-top:14px}
@@ -773,7 +824,8 @@ body.on-login .content{margin-left:0}
   </div>
   <nav>
     <div class="me" id="me"></div>
-    <button class="nav hl" data-go="dash" data-nav="dash"><svg class="ic"><use href="#i-home"/></svg><span>Dashboard</span><svg class="ic go sm"><use href="#i-chev"/></svg></button>
+    <button class="nav hl" data-go="mon" data-nav="mon"><svg class="ic"><use href="#i-home"/></svg><span>Dashboard<small>Monitoring Service Bengkel</small></span><svg class="ic go sm"><use href="#i-chev"/></svg></button>
+    <button class="nav hl" data-go="dash" data-nav="dash"><svg class="ic"><use href="#i-clip"/></svg><span>Service &amp; Laporan Kerusakan</span><svg class="ic go sm"><use href="#i-chev"/></svg></button>
     <button class="nav hl" data-go="mdb" data-nav="mdb"><svg class="ic"><use href="#i-lift"/></svg><span>MDB<small>Mobil di Bengkel</small></span><svg class="ic go sm"><use href="#i-chev"/></svg></button>
     <button class="nav" data-act="part"><svg class="ic"><use href="#i-gear"/></svg><span>PART</span><svg class="ic go sm rot open" id="partArrow"><use href="#i-down"/></svg></button>
     <div id="partSub">

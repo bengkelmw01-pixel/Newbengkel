@@ -15,7 +15,8 @@ function uniq(a) { var o = {}, r = []; a.forEach(function (x) { if (!o[x]) { o[x
 /* ---------- state ---------- */
 var CK = 'bka_v1';
 var S = {
-  data: null, view: 'dash', prev: 'dash', loading: false, lastLoad: 0,
+  data: null, view: 'mon', prev: 'mon', loading: false, lastLoad: 0,
+  mon: { d: '', h: '', jobs: null, q: [], fe: '', at: 0, err: '', busy: 0 },
   q: {}, chip: {}, lim: {}, desc: {}, mdb: { m: '1' },
   mi: {}, svc: { teknik: [], ki: [] }, cfg: {},
   pk: { n: '', job: null, q: [], busy: false, jn: '', lim: 0 },
@@ -156,6 +157,7 @@ function go(v) {
   renderShell(); window.scrollTo(0, 0);
   var nv = v.indexOf('jam') === 0 ? 'jam' : (v === 'jobpk' || v === 'nomo' || v === 'ck' || v === 'tb' || v === 'pem' || v === 'las' || v === 'tbmenu' || v === 'lc' ? 'jobmek' : (v === 'lapfokus' ? 'lapsvc' : (v === 'rsvform' ? 'rsv' : v))), ns = document.querySelectorAll('[data-nav]');
   for (var i = 0; i < ns.length; i++) ns[i].classList.toggle('on', ns[i].getAttribute('data-nav') === nv);
+  if (v === 'mon') monFetch();
   if (v.indexOf('jam') === 0) jamFetch(ljYm());
   if (v === 'lapsvc') lsFetch(lsYm());
   if (v === 'ck' || v === 'tb' || v === 'pem' || v === 'las') ckFetch(v, S[v].d);
@@ -204,10 +206,11 @@ function renderShell() {
   meUi();
   if (S.auth === 'login') { m.innerHTML = vLogin(); return; }
   if (S.auth === 'wait') { m.innerHTML = '<div class="loading"><div class="spinner"></div><div>Memeriksa akun...</div></div>'; return; }
-  if (!S.data) { m.innerHTML = '<div class="loading"><div class="spinner"></div><div>Memuat data dari Google Sheet...</div></div>'; return; }
+  if (!S.data && S.view !== 'mon') { m.innerHTML = '<div class="loading"><div class="spinner"></div><div>Memuat data dari Google Sheet...</div></div>'; return; }
   var v = S.view, h = '';
   document.body.classList.toggle('on-nomo', v === 'nomo');
-  if (v === 'dash') h = vDash();
+  if (v === 'mon') h = vMon();
+  else if (v === 'dash') h = vDash();
   else if (v === 'teknik' || v === 'ki') h = vSvc(v);
   else if (v === 'mdb') h = vMdb();
   else if (v === 'jobmek') h = vJob();
@@ -227,7 +230,7 @@ function renderShell() {
   else if (v === 'rsv') h = vRsv();
   else if (v === 'rsvform') h = vRsvForm();
   else if (v.indexOf('soon:') === 0) h = vSoon(v.slice(5));
-  else h = vDash();
+  else h = vMon();
   var sl = v === ljLast && $('#ljw') ? $('#ljw').scrollLeft : 0;
   ljLast = v;
   m.innerHTML = h;
@@ -695,6 +698,139 @@ function jamFetch(ym, force) {
   });
 }
 setInterval(function () { if (!document.hidden && S.view.indexOf('jam') === 0 && S.data) jamFetch(ljYm()); }, POLL_MS);
+
+/* ---------- Beranda: papan "Monitoring Service Bengkel" (realtime dari input mekanik dan pengawas) ---------- */
+var MON_POOL = 'POOL MARGASATWA';
+var MON_MS = window.BKA_MON_MS || 15000;
+var MON_J = { teknik: 'Teknik', ki: 'Keindahan', ck: 'Corrective (CK)', tb: 'Pengerjaan Cat', pem: 'Tabrak PEM', las: 'Las / Ketok' };
+var MON_Q = { teknik: 'Teknik', ki: 'Keindahan', ck: 'CK', tb: 'Cat', pem: 'PEM', las: 'Las' };
+function monJenis(r) { var b = MON_J[r.j] || r.j || '-'; return (r.j === 'teknik' || r.j === 'ki') && r.sv ? b + ' ' + r.sv : b; }
+function monDur(m) { return m == null || m === '' ? '-' : (m < 180 ? m + ' menit' : jamTxt(m)); }
+function monWa(wa) {                          /* 'dd/MM/yyyy HH:mm' -> { t: ms, hm: 'HH:mm', min } */
+  var m = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/.exec(wa || '');
+  if (!m) return null;
+  return { t: new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime(), hm: ('0' + m[4]).slice(-2) + ':' + m[5], min: (+m[4]) * 60 + (+m[5]) };
+}
+function monQcDur(r) {                        /* lama Pengecekan: dari pekerjaan selesai sampai disetujui pengawas */
+  var w = monWa(r.wa), p = isoParts(S.mon.d), a = tmin(r.e);
+  if (!w || a == null) return null;
+  return Math.max(0, Math.round((w.t - new Date(p.y, p.m - 1, p.d, 0, a).getTime()) / 60000));
+}
+function monDate(n) { return (HARI[n.getDay()] + ', ' + n.getDate() + ' ' + BULAN[n.getMonth()] + ' ' + n.getFullYear()).toUpperCase(); }
+/* satu mobil = satu unit: dikerjakan > Pengecekan (QC) > antrian > selesai */
+function monModel() {
+  var M = S.mon, jobs = M.jobs || [], q = M.q || [], U = {}, order = [];
+  function u(n) { if (!U[n]) { U[n] = { n: n, run: 0, qc: 0, ok: 0, tn: 0, q: [] }; order.push(n); } return U[n]; }
+  jobs.forEach(function (r) {
+    var x = u(r.n);
+    if (!r.e) x.run++; else if (r.st === 'Tunda') x.tn++; else if (r.ap === 'Disetujui') x.ok++; else x.qc++;
+  });
+  q.forEach(function (r) { u(r.n).q.push(r); });
+  var c = { masuk: order.length, run: 0, qc: 0, ant: 0, ok: 0 }, ok = [], ant = [];
+  order.forEach(function (n) {
+    var x = U[n]; x.st = x.run ? 'run' : (x.qc ? 'qc' : (x.q.length ? 'ant' : (x.ok ? 'ok' : 'ant')));
+    c[x.st]++;
+    if (x.st === 'ok') ok.push(x); else if (x.st === 'ant') ant.push(x);
+  });
+  var onlyTd = function (x) { return !x.q.length || x.q.every(function (z) { return z.td; }) ? 1 : 0; };      /* antrian yang seluruhnya tunda ada paling bawah */
+  ant.sort(function (a, b) { return onlyTd(a) - onlyTd(b); });
+  /* kabar terbaru (paling akhir di atas) */
+  var ev = [];
+  jobs.forEach(function (r) {
+    var n = '<b>' + esc(r.n) + '</b>', t, tx, w;
+    if (!r.e) { t = tmin(r.s); tx = n + ' sedang dikerjakan ' + esc(r.nm) + ' (' + esc(monJenis(r)) + ') sejak ' + esc(r.s); }
+    else if (r.st === 'Tunda') { t = tmin(r.e); tx = n + ' ditunda ' + esc(r.nm) + ' (' + esc(monJenis(r)) + ')' + (r.tc ? ': ' + esc(r.tc) : ''); }
+    else if (r.ap === 'Disetujui') { w = monWa(r.wa); t = w ? w.min : tmin(r.e); tx = n + ' lolos Pengecekan oleh ' + esc(r.pw || 'pengawas') + (w ? ' pukul ' + w.hm : ''); }
+    else { t = tmin(r.e); tx = n + ' sudah selesai, sedang dilakukan Pengecekan oleh pengawas (GH / SH)'; }
+    ev.push({ t: t == null ? -1 : t, h: tx, x: r.e || r.s || '' });
+  });
+  ev.sort(function (a, b) { return b.t - a.t; });
+  return { c: c, ok: ok, ant: ant, ev: ev.slice(0, 5) };
+}
+function monRow(cells, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + cells.join('</td><td>') + '</td></tr>'; }
+function monTable(head, widths, rows, empty) {
+  return '<table class="mn-t"><colgroup>' + widths.map(function (w) { return '<col style="width:' + w + '%">'; }).join('') + '</colgroup><thead><tr>' +
+    head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    (rows.length ? rows.join('') : '<tr><td class="mn-em" colspan="' + head.length + '">' + empty + '</td></tr>') + '</tbody></table>';
+}
+function monPanel(cls, title, body, id) { return '<div class="mn-pn ' + cls + '"' + (id ? ' id="' + id + '"' : '') + '><h3>' + title + '</h3>' + body + '</div>'; }
+function monBody() {
+  var M = S.mon;
+  if (!M.jobs) return M.err ? '<div class="err">Papan belum bisa dimuat: ' + esc(M.err) + (/tidak dikenal|not a function|getMonitor/i.test(M.err) ? '<br>Server belum diperbarui: tempel Code.gs terbaru di Apps Script, lalu Deploy &gt; Kelola deployment &gt; Edit &gt; Versi baru &gt; Deploy.' : '') + ' <a data-act="monref">Coba lagi</a></div>' : '<div class="loading"><div class="spinner"></div><div>Memuat papan monitoring...</div></div>';
+  var m = monModel(), c = m.c, jobs = M.jobs;
+  var svc = jobs.map(function (r, i) {
+    var run = !r.e, tn = r.st === 'Tunda';
+    return monRow([i + 1, esc(r.nm), '<span class="mn-car">' + esc(r.n) + '</span>', esc(monJenis(r)), esc(r.s || '-'),
+      '<span class="mn-st ' + (run ? 'mn-o' : (tn ? 'mn-v' : 'mn-g')) + '">' + (run ? 'Sedang dikerjakan' : (tn ? 'Ditunda' : 'Selesai')) + '</span>',
+      run ? '-' : esc(r.e), run ? '-' : esc(monDur(r.m))]);
+  });
+  var qcs = jobs.filter(function (r) { return r.e && r.st !== 'Tunda'; }).sort(function (a, b) { return (tmin(a.e) || 0) - (tmin(b.e) || 0); }).map(function (r, i) {
+    var ok = r.ap === 'Disetujui', w = ok ? monWa(r.wa) : null;
+    return monRow([i + 1, '<span class="mn-car">' + esc(r.n) + '</span><small>' + esc(monJenis(r)) + '</small>', esc(r.e),
+      '<span class="mn-st ' + (ok ? 'mn-g' : 'mn-o') + '">' + (ok ? 'Sudah selesai' : 'Pengecekan') + '</span>',
+      w ? w.hm : '-', ok ? monDur(monQcDur(r)) : '-', ok ? esc(r.pw || '-') : '-']);
+  });
+  var chips = function (list, empty, tag) {
+    return '<div class="mn-chips">' + (list.length ? list.map(function (x) {
+      var tg = tag ? tag(x) : '';
+      return '<span class="mn-chip' + (tg.td ? ' tn' : '') + '" data-n="' + esc(x.n) + '">' + esc(x.n) + (tg.t ? '<small>' + esc(tg.t) + '</small>' : '') + '</span>';
+    }).join('') : '<span class="mn-em">' + empty + '</span>') + '</div>';
+  };
+  var antTag = function (x) {
+    if (!x.q.length) return { t: 'Tunda', td: 1 };
+    var tt = [], td = true;
+    x.q.forEach(function (z) { var l = (MON_Q[z.j] || z.j) + (z.td ? ' (tunda)' : ''); if (tt.indexOf(l) < 0) tt.push(l); if (!z.td) td = false; });
+    return { t: tt.join(', '), td: td };
+  };
+  var tile = function (cls, lab, v, k) { return '<div class="mn-tile ' + cls + '"><small>' + lab + '</small><b data-k="' + k + '">' + v + '</b></div>'; };
+  var info = m.ev.length ? m.ev.map(function (e) { return '<p><span class="t">' + esc(e.x) + '</span>' + e.h + '</p>'; }).join('') : '<p>Belum ada pekerjaan hari ini.</p>';
+  var at = M.at ? hm(M.at) + ':' + ('0' + new Date(M.at).getSeconds()).slice(-2) : '-';
+  return '<div class="mn-body">' +
+    '<div class="mn-l">' +
+      monPanel('mn-red', 'PEKERJAAN SERVICE', monTable(['No', 'Petugas', 'Nomor Mobil', 'Jenis Service', 'Waktu Mulai', 'Status', 'Waktu Selesai', 'Durasi'], [5, 14, 16, 17, 10, 17, 11, 10], svc, 'Belum ada pekerjaan service hari ini.'), 'mon_svc') +
+      monPanel('mn-blu', 'QUALITY CONTROL SUPERVISOR', monTable(['No', 'Nomor Mobil', 'Waktu Mulai', 'Status', 'Waktu Selesai', 'Durasi', 'Supervisor'], [5, 18, 12, 20, 13, 13, 19], qcs, 'Belum ada pekerjaan yang masuk Pengecekan.'), 'mon_qc') +
+    '</div>' +
+    '<div class="mn-r">' +
+      monPanel('mn-blu', 'MOBIL SELESAI PERBAIKAN', chips(m.ok, 'Belum ada mobil yang selesai.'), 'mon_ok') +
+      monPanel('mn-grn', 'ANTRIAN SERVICE', chips(m.ant, 'Tidak ada antrian.', antTag), 'mon_ant') +
+    '</div>' +
+    '<div class="mn-tiles">' + tile('mn-tn', 'TOTAL UNIT MASUK', c.masuk, 'masuk') + tile('mn-tg', 'SELESAI SERVICE', c.ok, 'ok') + tile('mn-to', 'SEDANG DIKERJAKAN', c.run, 'run') + tile('mn-tq', 'SEDANG QC', c.qc, 'qc') + '</div>' +
+    '<div class="mn-info" id="mon_info"><h3>INFORMASI</h3>' + info + '</div>' +
+    '</div>' +
+    '<p class="mn-ft' + (M.err ? ' bad' : '') + '">' + (M.err ? 'Gagal memperbarui (' + esc(M.err) + '). ' : '') + (M.fe ? 'Sebagian data: ' + esc(M.fe) + '. ' : '') + 'Realtime dari input mekanik &middot; diperbarui <span id="mon_at">' + at + '</span> &middot; otomatis tiap ' + Math.round(MON_MS / 1000) + ' detik &middot; <a data-act="monref">Perbarui sekarang</a></p>';
+}
+function vMon() {
+  var n = new Date();
+  return '<section class="pad mn">' + errBanner() +
+    (isApv() ? '<button class="ap-dash" data-go="appr">' + ic('shield') + '<div><b>Approval</b><span id="apdt">' + (S.ap.rows ? (S.ap.rows.length ? S.ap.rows.length + ' pekerjaan menunggu persetujuan Anda' : 'Tidak ada pekerjaan yang menunggu') : 'Memuat...') + '</span></div>' + ic('chev', 'go') + '</button>' : '') +
+    '<div class="mn-hd"><img src="' + LJ_IMG + '" alt=""><div class="mn-ht"><h1>MONITORING SERVICE BENGKEL</h1><p>' + MON_POOL + '</p><p id="mon_d">' + monDate(n) + '</p></div>' +
+    '<div class="mn-clk"><small><span class="mn-live"></span>JAM SAAT INI</small><b id="mon_t">' + hm(n) + ':' + ('0' + n.getSeconds()).slice(-2) + '</b></div></div>' +
+    '<div id="monb">' + monBody() + '</div></section>';
+}
+function monUi() {
+  if (S.view !== 'mon') return;
+  var b = $('#monb'); if (!b) return;
+  var y = window.pageYOffset; b.innerHTML = monBody(); window.scrollTo(0, y);
+}
+function monFetch(force) {
+  var M = S.mon;
+  if (M.busy && Date.now() - M.busy < 30000) return Promise.resolve();
+  M.busy = Date.now();
+  return gs('getMonitor', [M.h || '', !!force]).then(function (r) {
+    M.busy = 0; M.err = ''; M.at = Date.now(); S.lastLoad = M.at;
+    if (r && r.jobs) { M.d = r.d; M.h = r.h; M.jobs = r.jobs; M.q = r.q || []; M.fe = r.fe || ''; }
+    else if (r && r.same) M.d = r.d || M.d;
+    monUi();
+  }, function (er) { M.busy = 0; M.err = msg(er); monUi(); });
+}
+function monTick() {
+  var t = $('#mon_t'); if (!t) return;
+  var n = new Date(); t.textContent = hm(n) + ':' + ('0' + n.getSeconds()).slice(-2);
+  var d = $('#mon_d'); if (d) d.textContent = monDate(n);
+  if (S.mon.d && todayIso() !== S.mon.d) monFetch();
+}
+setInterval(monTick, 1000);
+setInterval(function () { if (!document.hidden && S.view === 'mon' && S.auth !== 'login' && S.auth !== 'wait') monFetch(); }, MON_MS);
 
 /* satu baris per mekanik per hari: jam mulai = pengerjaan pertama, jam selesai = terakhir, total = jumlah lama semua pengerjaan yang sudah selesai */
 function ljGroup(rows) {
@@ -1389,12 +1525,12 @@ function pkShow() {
     '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>';
   else body = (done ? '<div class="pkx ro"><span>Pekerjaan Tambahan</span><p>' + esc(job.t || '-') + '</p></div>'
       : '<div class="pkx"><label for="pk_t">Pekerjaan Tambahan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="300" placeholder="Isi manual. Jika tidak ada, tulis: Tidak ada">' + esc(job.t || '') + '</textarea></div>') +
-    (fkOn(job) ? '<button class="btn ghost full pkbtn pknomo" data-act="nomo">' + ic('clip') + ' Form Fokus ' + (job.fs ? '<span class="pkbadge ok">' + ic('check', 'sm') + ' Tersimpan</span>' : '<span class="pkbadge">' + (job.fcl ? 'Memuat...' : 'Belum diisi') + '</span>') + '</button>' + fkCarryHtml(job) : '<div class="pkph" id="pk_ph">' + pkPhHtml(job) + '</div>') +
+    (fkOn(job) ? '<button class="btn ghost full pkbtn pknomo" data-act="nomo">' + ic('clip') + ' Form Fokus ' + (job.fs ? '<span class="pkbadge ok">' + ic('check', 'sm') + ' Tersimpan</span>' : '<span class="pkbadge">' + (job.fcl ? 'Memuat...' : 'Wajib diisi') + '</span>') + '</button>' + fkCarryHtml(job) : '<div class="pkph" id="pk_ph">' + pkPhHtml(job) + '</div>') +
     (done ? '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
         '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' +
         (job.ap ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>')
-      : '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + (phOn(job) && !phGo(job) ? ' disabled' : '') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
-        (phOn(job) ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>' : '') +
+      : '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + (phOn(job) && !phGo(job) || !fkGo(job) ? ' disabled' : '') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
+        (phOn(job) ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>' : (fkOn(job) ? '<div class="pkfs-hint" id="pk_fkh"' + (fkGo(job) ? ' style="display:none"' : '') + '>' + esc(fkHint(job)) + '</div>' : '')) +
         '<button class="btn ghost full pkbtn pktunda" data-act="pktunda">' + ic('clock') + ' Tunda</button><div class="pktd-h">Belum selesai? Tekan Tunda: waktu berhenti dan pekerjaan bisa dilanjutkan mekanik lain.</div>');
   el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(n) + '</b><span class="pill pk-' + j + '">' + jt + '</span></div>' +
     '<dl class="kv">' + rows + '</dl>' + pkLfHtml(job) + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
@@ -1410,6 +1546,8 @@ function phSlots(j) { return j && j.ck ? PHL : PHS; }
 function phMin(j) { return j && j.ck ? 1 : PHS.length; }
 var PHM = {};                       /* data foto di memori: kunci "idPengerjaan:kode" */
 function phOn(j) { return !!j && (j.ck ? kdOf(j) === 'las' : j.j === 'ki'); }          /* pengerjaan yang memakai 6 foto: Service Keindahan (Foto Kendaraan) dan Las (Foto Selesai Ketok). Service Teknik memakai Form Fokus */
+function fkGo(j) { return !fkOn(j) || !!j.fs; }          /* Service Teknik: Pengerjaan Selesai baru boleh ditekan setelah Form Fokus tersimpan (wajib) */
+function fkHint(j) { return j.fcl && !j.fs ? 'Form Fokus mekanik sebelumnya sedang dimuat. Tombol Pengerjaan Selesai aktif sesudahnya.' : 'Form Fokus wajib diisi dan disimpan dulu. Tombol Pengerjaan Selesai aktif setelah Form Fokus tersimpan.'; }
 function fkOn(j) { return !!j && !j.ck && j.j !== 'ki'; }          /* Service Teknik: Form Fokus (Form Pengukuran Servis), tanpa foto kendaraan */
 function phLb(j) { return j && j.ck ? 'foto selesai ketok' : 'foto kendaraan'; }
 function phLbC(j) { return j && j.ck ? 'Foto selesai ketok' : 'Foto kendaraan'; }
@@ -3084,8 +3222,9 @@ var ACT = {
     var i, d = null; for (i = 0; i < S.rs.done.length; i++) if (S.rs.done[i].id === a) d = S.rs.done[i];
     if (d) rsExport([d], 'Mobil ' + d.n + '   |   Service ' + d.sv, 'Laporan Reservasi ' + d.n + ' ' + d.sv + '.xlsx');
   },
+  monref: function () { monFetch(true); },
   part: function () { var s = $('#partSub'), a = $('#partArrow'); var hide = s.style.display !== 'none'; s.style.display = hide ? 'none' : ''; a.classList.toggle('open', !hide); },
-  back: function () { go(S.view === 'rsvform' ? 'rsv' : S.view === 'rsv' ? 'dash' : S.view === 'lapfokus' ? (S.ls.from === 'appr' ? 'appr' : 'lapsvc') : S.view === 'appr' ? 'dash' : S.view === 'nomo' ? 'jobpk' : S.view === 'tb' || S.view === 'pem' || S.view === 'las' || S.view === 'lc' ? 'tbmenu' : S.view === 'ck' || S.view === 'tbmenu' ? 'jobmek' : (S.view === 'jobpk' ? (S.pk.job && S.pk.job.ck ? kdOf(S.pk.job) : 'jobmek') : (S.prev && S.prev !== S.view ? S.prev : 'dash'))); },
+  back: function () { go(S.view === 'rsvform' ? 'rsv' : S.view === 'rsv' ? 'mon' : S.view === 'lapfokus' ? (S.ls.from === 'appr' ? 'appr' : 'lapsvc') : S.view === 'appr' ? 'mon' : S.view === 'nomo' ? 'jobpk' : S.view === 'tb' || S.view === 'pem' || S.view === 'las' || S.view === 'lc' ? 'tbmenu' : S.view === 'ck' || S.view === 'tbmenu' ? 'jobmek' : (S.view === 'jobpk' ? (S.pk.job && S.pk.job.ck ? kdOf(S.pk.job) : 'jobmek') : (S.prev && S.prev !== S.view ? S.prev : 'mon'))); },
   sync: function () {
     if (S.loading) return; toast('Menyinkronkan data...');
     if (S.view.indexOf('jam') === 0) jamFetch(ljYm(), true);
@@ -3185,6 +3324,12 @@ var ACT = {
     if (!j.ck && phOn(j) && phFilled(j) < phMin(j)) {          // Service Keindahan: waktu baru boleh berhenti setelah ke-6 foto kendaraan dimasukkan
       toast('Masukkan ' + PHS.length + ' foto kendaraan dulu (' + phFilled(j) + '/' + PHS.length + '). Waktu baru berhenti setelah foto lengkap.', true);
       var pe0 = $('#pk_ph'); if (pe0) { try { pe0.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
+      return;
+    }
+    if (!j.ck && !fkGo(j)) {          // Service Teknik: Form Fokus wajib disimpan sebelum waktu boleh berhenti
+      var tf = $('#pk_t'); if (tf) j.t = tf.value; pkJobSave();
+      toast(j.fcl ? 'Form Fokus mekanik sebelumnya masih dimuat, tunggu sebentar.' : 'Isi Form Fokus dulu (wajib). Waktu baru berhenti setelah Form Fokus tersimpan.', true);
+      var pf = $('.pknomo'); if (pf) { try { pf.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
       return;
     }
     var ta = $('#pk_t'), t = (ta ? ta.value : (j.t || '')).replace(/\s+/g, ' ').trim();
@@ -3508,7 +3653,7 @@ var ACT = {
       S.loginBusy = false;
       if (r && r.ok && r.u) {
         S.loginNip = ''; S.td = { rows: [], ssel: [], sel: [], loc: [], h: '', busy: false, err: '' }; S.users.rows = null; S.users.h = '';
-        S.ap.rows = null; S.ap.h = ''; rsReset(); meSet(r.u); S.view = 'dash'; renderShell(); toast('Masuk sebagai ' + r.u.nama); if (apHome()) go('appr');
+        S.ap.rows = null; S.ap.h = ''; rsReset(); meSet(r.u); S.view = 'mon'; renderShell(); monFetch(); toast('Masuk sebagai ' + r.u.nama); if (apHome()) go('appr');
       } else { S.loginErr = (r && r.err) || 'NIP tidak dikenal.'; rerender(); }
     }, function (er) { S.loginBusy = false; S.loginErr = 'Gagal tersambung ke server: ' + msg(er); rerender(); });
   },
@@ -3518,7 +3663,7 @@ var ACT = {
     if (j && !j.e && !j.cf) { toast('Selesaikan atau tunda dulu pengerjaan #' + j.n + ' sebelum keluar.', true); return; }
     if (j) { if (pkAnyPending(j)) S.pk.q.push(j); S.pk.job = null; S.pk.n = ''; pkJobSave(); }
     S.me = null; S.auth = 'login'; S.loginErr = ''; S.loginNip = ''; S.td = { rows: [], ssel: [], sel: [], loc: [], h: '', busy: false, err: '' }; S.users.rows = null; S.users.h = ''; S.ap.rows = null; S.ap.h = ''; S.ap.done = []; rsReset();
-    meSave(); S.view = 'dash'; renderShell(); pkSync();
+    meSave(); S.view = 'mon'; renderShell(); monFetch(); pkSync();
   },
   usak: function (a) {
     var o = S.users.ak; if (!o) return;
@@ -3641,7 +3786,7 @@ S.jam.d = todayIso(); S.jam.rm = S.jam.d.slice(0, 7);
   if (ch) pkJobSave();
 })();
 meUi();
-go(apHome() ? 'appr' : 'dash');
+go(apHome() ? 'appr' : 'mon');
 var cached = cacheLoad();
 if (cached && cached.master) { S.data = cached; derive(); renderShell(); }
 meCheck();
