@@ -22,7 +22,8 @@ var S = {
   pk: { n: '', job: null, q: [], busy: false, jn: '', lim: 0 },
   jam: { d: '', rm: '', rows: {}, busy: {}, err: '' },
   ck: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
-  tb: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
+  tb: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null, reg: '' },
+  tbreg: { rows: null, h: '', busy: 0, err: '', dirty: 0 },
   pem: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   las: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   ls: { d: '', rm: '', mode: 'hari', jenis: 'all', q: '', rows: {}, busy: {}, err: '', open: '', det: {}, dl: 0 },
@@ -161,6 +162,7 @@ function go(v) {
   if (v.indexOf('jam') === 0) jamFetch(ljYm());
   if (v === 'lapsvc') lsFetch(lsYm());
   if (v === 'ck' || v === 'tb' || v === 'pem' || v === 'las') ckFetch(v, S[v].d);
+  if (v === 'tb') tbRegFetch();
   if (v === 'jobmek') ckWarm();
   if (v === 'lc') lcFetch(true);
   if (v === 'lapfokus') { lsFetch(lsYm()); lsDetail(S.ls.open); }
@@ -1709,7 +1711,7 @@ function ckWarm() {
     setTimeout(function () { if (!S.loading && !ckAnyBusy()) ckFetch(kd, d, false, true); }, i * 900);
   });
 }
-setInterval(function () { var kd = kdView(); if (document.hidden || !kd || !S.data) return; ckFetch(kd, S[kd].d); }, POLL_MS);
+setInterval(function () { var kd = kdView(); if (document.hidden || !kd || !S.data) return; ckFetch(kd, S[kd].d); if (kd === 'tb') tbRegFetch(); }, POLL_MS);
 
 function ckRowOf(kd, k) {
   var R = S[kd].rows[S[kd].d], i;
@@ -1865,11 +1867,49 @@ function ckStats(kd) {
   var chip = function (k, t, n) { return '<button class="ls-chip' + (C.st === k ? ' on' : '') + '" data-act="ckst" data-a="' + k + '" data-b="' + kd + '">' + t + ' <b>' + n + '</b></button>'; };
   return bar + '<div class="ls-chips">' + chip('all', 'Semua', o.all) + chip('new', 'Belum', o['new']) + chip('run', 'Dikerjakan', o.run) + chip('tunda', 'Tunda', o.tunda) + chip('done', 'Selesai', o.done) + (kd === 'tb' ? chip('las', 'Di Las', o.las) : '') + '</div>';
 }
+/* ---------- Tabrak Cat: pilihan "No Registrasi" seperti Input Bengkel di aplikasi klaim ----------
+   Isinya semua No Registrasi yang belum ada foto selesainya (akan dikerjakan / tunda). Begitu Cat mengirim foto selesai, No Registrasi itu hilang dari pilihan.
+   Memilih satu No Registrasi membuka tanggal laporannya dan menampilkan kartu itu (tombol Kerjakan / Lanjutkan). */
+function tbRegVal(x) { return x.rg + '|' + x.d; }
+function tbRegHtml() {
+  var T = S.tbreg, R = T.rows, cur = S.tb.reg, has = false, i;
+  if (R) for (i = 0; i < R.length; i++) if (tbRegVal(R[i]) === cur) has = true;
+  if (!has) cur = '';
+  var lab = R ? 'Semua No Registrasi (' + R.length + ' belum selesai)' : 'Memuat No Registrasi...';
+  return '<label for="tb_reg">No Registrasi <small>belum ada foto selesai &middot; akan dikerjakan / tunda</small></label>' +
+    '<select id="tb_reg"' + (R ? '' : ' disabled') + '><option value="">' + esc(lab) + '</option>' +
+    (R || []).map(function (x) { var v = tbRegVal(x); return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(x.rg + ' - ' + (x.nm || '-') + ' (' + (x.n || '-') + ')') + '</option>'; }).join('') + '</select>' +
+    (T.err ? '<div class="tb-regerr">Gagal memuat daftar No Registrasi: ' + esc(T.err) + ' <a data-act="tbregref">Coba lagi</a></div>' : '');
+}
+function tbRegUi() {
+  var w = $('#tb_regw'); if (!w || S.view !== 'tb') return;
+  var ae = document.activeElement;
+  if (ae && ae.id === 'tb_reg' && !S.tbreg.err) { S.tbreg.dirty = 1; return; }          /* pilihan sedang dibuka: jangan ditutup, perbarui setelah selesai */
+  S.tbreg.dirty = 0; w.innerHTML = tbRegHtml();
+}
+function tbRegFetch(force) {
+  var T = S.tbreg; if (T.busy && Date.now() - T.busy < 30000) return Promise.resolve();
+  T.busy = Date.now();
+  return gs('getTBReg', [T.h || '', !!force]).then(function (r) {
+    T.busy = 0; T.err = '';
+    if (r && r.rows) { T.rows = r.rows; T.h = r.h; T.dirty = 1; }
+    if (T.dirty || !T.rows) tbRegUi();
+  }, function (er) { T.busy = 0; T.err = msg(er); tbRegUi(); });
+}
+/* ganti tanggal / ketik pencarian: pilihan No Registrasi dilepas (pencarian yang berasal dari pilihan dikosongkan) */
+function tbRegReset() { var C = S.tb; if (C.reg) { if (C.q === C.reg.split('|')[0]) C.q = ''; C.reg = ''; } }
+function tbRegPick(v) {
+  var C = S.tb, p = v ? v.split('|') : [];
+  C.reg = v || '';
+  if (v && p[1]) { C.d = p[1] > todayIso() ? todayIso() : p[1]; C.q = p[0]; C.st = 'all'; } else C.q = '';
+  renderShell(); ckFetch('tb', C.d);
+}
 function vCk(kd) {
   var C = S[kd], cf = KDC[kd]; if (!C.d) C.d = todayIso();
   var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (kd === 'tb' ? 'Tabrak &middot; Cat' : (kd === 'pem' ? 'Tabrak &middot; PEM' : (kd === 'las' ? 'Tabrak &middot; Las' : cf.t))) + '</h2></div>';
   var head = '<div class="ls-head"><div class="ls-hi">' + ic('wrench') + '</div><div><h3>' + cf.judul + '</h3><p>' + cf.info + '</p></div></div>';
   return sub + '<section class="pad ck-pad">' + errBanner() + head + '<div class="ls-box"><div id="' + kd + '_nav">' + (kd === 'pem' || kd === 'las' ? '' : ckNav(kd)) + '</div><div id="' + kd + '_stats">' + ckStats(kd) + '</div>' +
+    (kd === 'tb' ? '<div class="tb-reg" id="tb_regw">' + tbRegHtml() + '</div>' : '') +
     searchBar(kd + '_q', cf.cari, C.q) + '<div class="ck-inf" id="' + kd + '_inf">' + ckInfoHtml(kd) + '</div><div id="' + kd + '_body">' + ckBody(kd) + '</div></div>' + foot() + '</section>';
 }
 /* hanya bagian status dan daftar yang digambar ulang (kolom cari tetap fokus, tanggal yang sedang dipilih tidak tertutup) */
@@ -3506,7 +3546,7 @@ var ACT = {
       F.fo = []; F.up = {}; F.rq = ''; F.msg = '';
       if (S.pk.job === j) { c.fs = res.fs.slice(0, 6); pkJobSave(); }
       pkFsUi(); toast('Foto selesai terkirim ke aplikasi klaim (' + res.fs.length + ' foto).');
-      ckFetch('tb', c.d, true, true);
+      ckFetch('tb', c.d, true, true); tbRegFetch(true);
     }, function (er) { F.busy = 0; F.msg = msg(er) + ' Foto tidak hilang, tekan Kirim lagi.'; pkFsUi(); });
   },
   pklc: function () { go('lc'); },
@@ -3515,8 +3555,9 @@ var ACT = {
   lcfs: function (a, b) { var r = null, R = S.lc.rows || [], i; for (i = 0; i < R.length; i++) if (R[i].k === a) r = R[i]; if (r) tbFotoOpen(r.fs || [], +b, 'Foto sesudah · ' + r.n, 'sesudah'); },
   phcam: function (a) { phAsk(a, 'ph_cam'); },
   phfile: function (a) { phAsk(a, 'ph_file'); },
-  ckday: function (a, b) { var kd = kdArg(b), C = S[kd], nd = isoAdd(C.d, +a); if (nd > todayIso()) return; C.d = nd; renderShell(); ckFetch(kd, nd); },
-  cktoday: function (a, b) { var kd = kdArg(b); S[kd].d = todayIso(); renderShell(); ckFetch(kd, S[kd].d); },
+  ckday: function (a, b) { var kd = kdArg(b), C = S[kd], nd = isoAdd(C.d, +a); if (nd > todayIso()) return; if (kd === 'tb') tbRegReset(); C.d = nd; renderShell(); ckFetch(kd, nd); },
+  cktoday: function (a, b) { var kd = kdArg(b); if (kd === 'tb') tbRegReset(); S[kd].d = todayIso(); renderShell(); ckFetch(kd, S[kd].d); },
+  tbregref: function () { tbRegFetch(true); },
   ckst: function (a, b) { var kd = kdArg(b); S[kd].st = a; ckRefresh(kd); },
   ckopen: function () { if (S.pk.job) go('jobpk'); },
   ckgo: function (a, b) {
@@ -3739,16 +3780,18 @@ document.addEventListener('input', function (e) {
   else if (e.target.id === 'rs_sv') { var sv1 = e.target.value.replace(/\D/g, '').slice(0, 2); if (sv1 !== e.target.value) e.target.value = sv1; if (S.rs.f) { S.rs.f.sv = sv1; rsItemsUi(); var se = $('#rs_err'); if (se) se.textContent = ''; } }
   else if (e.target.classList && e.target.classList.contains('rs-exi')) rsExGrow(e.target);
   else if (e.target.id === 'pk_kt' || e.target.id === 'pk_kq') { e.target.classList.remove('bad'); $('#pk_aperr').textContent = ''; }
-  else if (/^(ck|tb|pem|las)_q$/.test(e.target.id || '')) { var kq = e.target.id.split('_')[0]; S[kq].q = e.target.value; ckRefresh(kq); }
+  else if (/^(ck|tb|pem|las)_q$/.test(e.target.id || '')) { var kq = e.target.id.split('_')[0]; S[kq].q = e.target.value; if (kq === 'tb' && S.tb.reg) { S.tb.reg = ''; tbRegUi(); } ckRefresh(kq); }
   else if (/^(ck|tb|pem|las)_pq$/.test(e.target.id || '')) { var kp = e.target.id.split('_')[0]; if (S[kp].pick) { S[kp].pick.q = e.target.value; ckPickRefresh(kp); } }
   else if (/^fk_/.test(e.target.id || '')) { fkInput(e.target.id.slice(3), e.target.value, e.target); }
   else if (e.target.id === 'pk_t') { var jt = S.pk.job; if (jt && !jt.e) { jt.t = e.target.value; e.target.classList.remove('bad'); pkJobSave(); if (jt.ck && kdOf(jt) === 'las') phDoneUi(jt); } }
 });
+document.addEventListener('focusout', function (e) { if (e.target && e.target.id === 'tb_reg' && S.tbreg.dirty) setTimeout(tbRegUi, 150); });
 document.addEventListener('change', function (e) {
+  if (e.target.id === 'tb_reg') { tbRegPick(e.target.value); return; }
   if (e.target.id === 'ap_kt' || e.target.id === 'ap_kq') { var ae = $('#ap_err'); if (ae) ae.textContent = ''; e.target.classList.remove('bad'); return; }
   if (/^(ck|tb|pem|las)_d$/.test(e.target.id || '')) {
     var cv = e.target.value, ct = todayIso(), kc = e.target.id.split('_')[0];
-    if (/^\d{4}-\d{2}-\d{2}$/.test(cv)) { if (cv > ct) cv = ct; S[kc].d = cv; renderShell(); ckFetch(kc, cv); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cv)) { if (cv > ct) cv = ct; if (kc === 'tb') tbRegReset(); S[kc].d = cv; renderShell(); ckFetch(kc, cv); }
     return;
   }
   if (e.target.id === 'ls_d') {
