@@ -1508,7 +1508,7 @@ function vPk() {
     '<button type="button" class="seg s-teknik' + (can('teknik') ? '' : ' dis') + (p.jn === 'teknik' ? ' sel' : '') + '" data-act="pkjenis" data-a="teknik">Service Teknik</button>' +
     '<button type="button" class="seg s-ki' + (can('ki') ? '' : ' dis') + (p.jn === 'ki' ? ' sel' : '') + '" data-act="pkjenis" data-a="ki">Service Keindahan</button></div>' +
     '<div class="pkhint">Pilih jenis service, lalu tekan Kerjakan pada mobil yang akan diservis. Ketik No Mobil untuk mencari.</div></div>' +
-    '<div id="pkres"></div><div class="pklist" id="pk_list"></div><div id="pk_td">' + tdInner() + '</div></div>' + foot() + '</section>';
+    '<div id="pkres"></div><div id="pk_td">' + tdInner() + '</div><div class="pklist" id="pk_list"></div></div>' + foot() + '</section>';          /* pekerjaan tunda (belum selesai) di atas daftar mobil */
 }
 /* ---------- Job Mekanik > Corrective Supporting (CS) ----------
    Pilih Pekerjaan (daftar gulir) -> nama petugas dan jabatan terisi otomatis -> Nomor Mobil diisi manual (Perawatan mojul: Nomor Plat) -> Kerjakan -> tanya "Apakah Anda akan mengerjakan unit ini?" -> waktu mulai.
@@ -1971,11 +1971,13 @@ function ckCounts(kd, rows) {
   rows.forEach(function (r) { var s = ckSt(kd, r).s; if (s === 'new') o['new']++; else if (s === 'done') o.done++; else if (s === 'tunda') o.tunda++; else if (s === 'las') o.las++; else o.run++; });
   return o;
 }
-/* urutan daftar: pekerjaan TUNDA selalu paling bawah (urutan lain tetap seperti dari server) */
+/* urutan daftar: yang BELUM SELESAI di atas, yang sudah selesai di bawah. Tunda paling atas, lalu sedang dikerjakan, lalu belum dikerjakan, lalu yang dikirim ke Las, terakhir yang selesai.
+   Urutan di dalam satu kelompok tetap seperti dari server. */
+var CK_RANK = { tunda: 0, run: 1, other: 1, 'new': 2, las: 3, done: 4 };
 function ckOrder(kd, rows) {
-  var a = [], b = [];
-  rows.forEach(function (r) { (ckSt(kd, r).s === 'tunda' ? b : a).push(r); });
-  return a.concat(b);
+  var g = [[], [], [], [], [], []];
+  rows.forEach(function (r) { var k = CK_RANK[ckSt(kd, r).s]; g[k == null ? 2 : k].push(r); });
+  return [].concat.apply([], g);
 }
 function ckFilter(kd, rows) {
   var C = S[kd], q = norm(C.q).trim();
