@@ -21,8 +21,8 @@ var S = {
   mon: { d: '', h: '', jobs: null, q: [], fe: '', at: 0, err: '', busy: 0 },
   q: {}, chip: {}, lim: {}, desc: {}, mdb: { m: '1' },
   mi: {}, svc: { teknik: [], ki: [] }, cfg: {},
-  pk: { n: '', job: null, q: [], busy: false, jn: '', lim: 0 },
-  cs: { p: '', n: '' },
+  pk: { n: '', job: null, q: [], bg: [], busy: false, jn: '', lim: 0 },
+  cs: { p: '', n: '', m: [] },
   jam: { d: '', rm: '', rows: {}, busy: {}, err: '' },
   ck: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   tb: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null, reg: '' },
@@ -41,6 +41,7 @@ var S = {
 try { var pj0 = JSON.parse(localStorage.getItem('bka_pkjob') || 'null'); if (pj0 && pj0.n && pj0.j && pj0.s) { pj0.id = pj0.id || 'J' + pj0.s + 'x'; S.pk.job = pj0; } } catch (e) {}
 try { var me0 = JSON.parse(localStorage.getItem('bka_user') || 'null'); if (me0 && me0.nama && me0.jobs) { S.me = me0; S.auth = 'ok'; } } catch (e) {}
 try { var pq0 = JSON.parse(localStorage.getItem('bka_pkq') || '[]'); if (pq0 && pq0.length) S.pk.q = pq0.filter(function (x) { return x && x.id && x.n && x.s; }); } catch (e) {}
+try { var pb0 = JSON.parse(localStorage.getItem('bka_pkbg') || '[]'); if (pb0 && pb0.length) S.pk.bg = pb0.filter(function (x) { return x && x.id && x.n && x.s && (!S.pk.job || S.pk.job.id !== x.id); }); } catch (e) {}
 var PV = {
   ban:     { title: 'BAN',               icon: 'tire',   unit: 'Data', cols: ['No Mobil', 'Embos', 'KM Total'],  grid: '1.15fr .9fr 1.2fr', chips: false, key: 'BAN' },
   kopling: { title: 'KOPLING',           icon: 'clutch', unit: 'Unit', cols: ['No Mobil', 'Tipe', 'Total KM'],   grid: '1.1fr 1.2fr 1fr',   chips: true,  key: 'KOPLING' },
@@ -138,6 +139,7 @@ function syncUi() {
 /* ---------- navigation ---------- */
 function go(v) {
   if (isPkl() && PKL_VIEWS.indexOf(v) < 0) v = 'jobmek';          /* PKL hanya boleh membuka halaman pekerjaan */
+  if (isLh() && LH_VIEWS.indexOf(v) < 0) v = 'dash';          /* akses Lihat saja: hanya Service & Laporan Kerusakan */
   if (v === 'pengaturan' && !isAdmin()) { toast('Menu Pengaturan khusus Admin.', true); return; }
   if (v === 'appr' && !isApv() && !canIzin()) { toast('Menu Approval khusus Group Head / Section Head.', true); return; }
   if ((v === 'lapsvc' || v === 'lapfokus') && !canMenu('ls')) { toast('Akun Anda tidak punya akses ke menu Laporan Service.', true); return; }
@@ -151,13 +153,13 @@ function go(v) {
   if (v === 'pem' && !canView('pem')) { toast('Akun Anda tidak punya akses ke Tabrak PEM.', true); return; }
   if (v === 'jobpk' && !S.pk.job && !canView('teknik') && !canView('ki')) { toast('Akun Anda tidak punya akses ke Preventive Kendaraan.', true); return; }
   if (v === 'jobcs' && !can('cs')) { toast('Akun Anda tidak punya akses ke Corrective Supporting (CS).', true); return; }
-  if (v === 'jobcs' && S.pk.job && S.pk.job.j === 'cs' && !S.pk.job.e) v = 'jobpk';          /* CS yang sedang berjalan: buka halaman pengerjaannya */
-  if (v === 'jobcs' && S.view !== 'jobcs') S.cs = { p: '', n: '' };
+  if (v === 'jobcs' && S.pk.job && S.pk.job.j === 'cs' && !S.pk.job.e && !pkMulti()) v = 'jobpk';          /* CS yang sedang berjalan: buka halaman pengerjaannya */
+  if (v === 'jobcs' && S.view !== 'jobcs') S.cs = { p: '', n: '', m: [] };
   if (v === 'rsvform' && !S.rs.f) v = 'rsv';
   if (v === 'jam' && S.view.indexOf('jam') !== 0) S.jam.d = todayIso();
   if ((v === 'jamharian' || v === 'jambulan') && S.view === 'jam') S.jam.rm = S.jam.d.slice(0, 7);
   /* pengerjaan CK yang sudah selesai tidak menghalangi form Preventive Kendaraan (hanya bisa dilihat lagi lewat daftar CK) */
-  if (v === 'jobpk' && S.view !== 'ck' && S.view !== 'tb' && S.view !== 'pem' && S.view !== 'las' && S.view !== 'jobpk' && S.view !== 'nomo' && S.pk.job && S.pk.job.ck && S.pk.job.e) {
+  if (v === 'jobpk' && S.view !== 'ck' && S.view !== 'tb' && S.view !== 'pem' && S.view !== 'las' && S.view !== 'jobpk' && S.view !== 'nomo' && !S.pk.sw && S.pk.job && S.pk.job.ck && S.pk.job.e) {
     if (pkAnyPending(S.pk.job)) S.pk.q.push(S.pk.job);
     S.pk.job = null; S.pk.n = ''; pkJobSave(); pkSync();
   }
@@ -205,7 +207,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-03 09:37';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-03 12:01';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -221,7 +223,9 @@ function renderShell() {
   var m = $('#main');
   document.body.classList.toggle('on-login', S.auth === 'login');
   document.body.classList.toggle('is-pkl', isPkl());
+  document.body.classList.toggle('is-lh', isLh());
   if (isPkl() && PKL_VIEWS.indexOf(S.view) < 0) S.view = 'jobmek';
+  if (isLh() && LH_VIEWS.indexOf(S.view) < 0) S.view = 'dash';
   meUi();
   if (S.auth === 'login') { m.innerHTML = vLogin(); return; }
   if (S.auth === 'wait') { m.innerHTML = '<div class="loading"><div class="spinner"></div><div>Memeriksa akun...</div></div>'; return; }
@@ -261,7 +265,7 @@ var ljLast = '';
 function rerender() {
   // data diperbarui di latar belakang: pertahankan isi kolom cari/form, kursor, dan posisi gulir
   var q = $('#q'); if (q) S.q[S.view] = q.value;
-  var ae = document.activeElement, fid = ae && /^(q|pk_n|cs_n|pk_t|lc_n|ls_q|rs_q|rs_ket|ck_q|ck_pq|tb_q|tb_pq|pem_q|pem_pq|las_q|las_pq|lg_n|fk_.+)$/.test(ae.id || '') ? ae.id : '';
+  var ae = document.activeElement, fid = ae && /^(q|pk_n|cs_n|cs_m\d+|pk_t|lc_n|ls_q|rs_q|rs_ket|ck_q|ck_pq|tb_q|tb_pq|pem_q|pem_pq|las_q|las_pq|lg_n|fk_.+)$/.test(ae.id || '') ? ae.id : '';
   var pos = fid ? ae.selectionStart : 0, y = window.pageYOffset;
   renderShell();
   window.scrollTo(0, y);
@@ -284,12 +288,12 @@ function vDash() {
     '<div class="grid2 d">' +
     card('teknik', 'c-vio', 'teknik', 'Service Teknik', [labT, nt]) +
     card('ki', 'c-grn', 'ki', 'Service Keindahan', [labK, nk]) +
-    card('soon:Prediksi Part', 'c-org', 'part', 'Prediksi Part') +
-    card('soon:Jam Kerja Mekanik', 'c-blu', 'jam', 'Jam Kerja Mekanik') +
+    (isLh() ? '' : card('soon:Prediksi Part', 'c-org', 'part', 'Prediksi Part') +
+    card('soon:Jam Kerja Mekanik', 'c-blu', 'jam', 'Jam Kerja Mekanik')) +
     '</div>' +
     '<div class="lapcard"><div class="lapicon">' + ic('clip', 'xl').replace('xl', '') + '</div><div><b>Corrective Kendaraan (CK)</b><span>Laporan kerusakan dari operasional</span></div>' +
     '<div class="cnt"><b class="red">' + baru + '</b><i>/</i><b class="grn">' + kerja + '</b><small>Baru</small><span></span><small>Dikerjakan</small></div></div>' +
-    '<button class="btn full" data-act="addlap">' + ic('plus') + ' Tambah Laporan Kerusakan</button>' +
+    (isLh() ? '' : '<button class="btn full" data-act="addlap">' + ic('plus') + ' Tambah Laporan Kerusakan</button>') +
     searchBar('q', 'Cari nomor mobil, keluhan, atau lokasi...', S.q.dash) +
     '<div id="list"></div>' + foot() + '</section>';
 }
@@ -314,7 +318,7 @@ var JOBS = [
 function vJob() {
   var pk = isPkl(), lst = pk ? JOBS.filter(function (j) { return j.acc ? j.acc() : true; }) : JOBS;
   return '<div class="subhead">' + (pk ? '' : '<button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button>') + '<h2>Job Mekanik</h2></div>' +
-    '<section class="pad">' + errBanner() + (pk ? '<div class="ap-note">' + ic('shield') + '<div>Sebelum mulai mengerjakan, Anda perlu ACC dari Section Head / Group Head atau Devi. Tekan <b>Kerjakan</b>, lalu tunggu sampai disetujui. Kecuali CS <b>Tambah ban</b>: langsung mulai tanpa ACC.</div></div>' : '') + (pk && !lst.length ? '<div class="empty">Belum ada pekerjaan yang diberikan ke akun Anda.<br><small>Hubungi admin.</small></div>' : '') + '<div class="jobs">' + lst.map(function (j) {
+    '<section class="pad">' + errBanner() + '<div id="pkbgw">' + pkBgHtml(true) + '</div>' + (pk ? '<div class="ap-note">' + ic('shield') + '<div>Sebelum mulai mengerjakan, Anda perlu ACC dari Section Head / Group Head atau Devi. Tekan <b>Kerjakan</b>, lalu tunggu sampai disetujui. Kecuali CS <b>Tambal ban</b>: langsung mulai tanpa ACC.</div></div>' : '') + (pk && !lst.length ? '<div class="empty">Belum ada pekerjaan yang diberikan ke akun Anda.<br><small>Hubungi admin.</small></div>' : '') + '<div class="jobs">' + lst.map(function (j) {
       var okj = j.acc ? j.acc() : true;
       return '<button class="jcard ' + j.cls + (okj ? '' : ' lock') + '" ' + (okj ? 'data-go="' + (j.go || 'soon:' + esc(j.t)) + '"' : 'data-act="nojob" data-a="' + esc(j.t) + '"') + ' aria-label="' + esc(j.t) + '"><img class="jimg" src="' + JOB_IMG[j.img] + '" alt="">' +
         (okj ? (j.vo && j.vo() ? '<span class="jlk vo">' + ic('search') + 'Hanya lihat</span>' : '') : '<span class="jlk">' + ic('lock') + 'Tidak ada akses</span>') + (okj && j.jb ? jbSpan(j.jb) : '') + '<span class="jbadge">' + j.k + '</span><span class="jt">' + j.t.replace(' ', '<br>') + '</span></button>';
@@ -383,7 +387,7 @@ function lcFormHtml() {
 function lcAutoStart(res, fo) {
   if (!canKd('tb')) return;
   var cur = S.pk.job;
-  if (cur && !cur.e) { toast('LC dibuat. Pengerjaan #' + cur.n + ' masih berjalan: selesaikan atau tunda dulu, lalu tekan Kerjakan untuk LC ini.', true); return; }
+  if (cur && !cur.e && !(pkMulti() && !cur.cf)) { toast('LC dibuat. Pengerjaan #' + cur.n + ' masih berjalan: selesaikan atau tunda dulu, lalu tekan Kerjakan untuk LC ini.', true); return; }
   ckBegin('tb', { k: res.k, d: res.d, jm: hm(Date.now()), rg: res.rg, n0: res.n, fo: (fo || []).slice(0, 4), fs: [], kl: 'LC (laporan petugas cat)', lc: 1 }, res.n);
   toast('LC dibuat. No Registrasi ' + res.rg + '. Pekerjaan Cat dimulai, jam kerja berjalan.');
 }
@@ -600,13 +604,14 @@ function usFetch() {
    APPROVAL (Group Head / Section Head) berdiri sendiri: hanya melihat + menyetujui; boleh ditambahkan ke kode lain, mis. "CK,APPROVAL". */
 var AK_JOBS = [['TEKNIK', 'Teknik'], ['KI', 'Keindahan'], ['CAT', 'Cat'], ['CK', 'CK'], ['PS', 'PS'], ['CS', 'CS'], ['LAS', 'Las'], ['PEM', 'PEM']];
 function akParse(s) {
-  var o = { admin: false, apv: false, izin: false, rsv: false, ls: false, asgh: false, gdg: false, set: {} };
+  var o = { admin: false, apv: false, izin: false, rsv: false, ls: false, asgh: false, gdg: false, lh: false, set: {} };
   String(s == null ? '' : s).toUpperCase().split(/[^A-Z]+/).forEach(function (w) {
     if (!w) return;
     if (w === 'ASGH') o.asgh = true;
     else if (w === 'GUDANG' || w === 'GDG') o.gdg = true;
     else if (w === 'APPROVAL' || w === 'APPROVER') o.apv = true;
     else if (w === 'IZINPKL') o.izin = true;
+    else if (w === 'LIHAT') o.lh = true;
     else if (w === 'RESERVASI') o.rsv = true;
     else if (w === 'LAPSERVICE' || w === 'LAPORAN' || w === 'LAPSVC') o.ls = true;
     else if (w === 'ADMIN') o.admin = true;
@@ -624,6 +629,7 @@ function akBase(o) {
   return AK_JOBS.filter(function (x) { return o.set[x[0]]; }).map(function (x) { return x[0]; }).join(',');
 }
 function akVal(o) {
+  if (o.lh && !o.admin && !o.apv) return 'LIHAT';          /* Lihat saja berdiri sendiri */
   var b = akBase(o), t = [];
   if (b) t.push(b);
   if (!o.admin && o.rsv) t.push('RESERVASI');          /* Admin sudah termasuk semua menu */
@@ -636,6 +642,7 @@ function akVal(o) {
 }
 function akLb(s) {
   var o = akParse(s), b = akBase(o), t;
+  if (o.lh && !o.admin && !o.apv) return 'Lihat saja (hanya Service & Laporan Kerusakan)';
   if (o.admin) t = 'Admin (semua pekerjaan + kelola user)';
   else {
     var pt = [];
@@ -668,9 +675,14 @@ function akChips(o) {
     '<span class="ak-sp"></span>' + [['RESERVASI', 'Reservasi', 'rsv'], ['LAPSERVICE', 'Laporan service', 'ls']].map(function (m) {
       var on = o.admin || o.apv || o[m[2]] || (m[2] === 'rsv' && (o.asgh || o.gdg)), lk = o.admin ? ' lk' : (o.apv || (m[2] === 'rsv' && (o.asgh || o.gdg)) ? ' lkv' : '');          /* Admin dan Approval otomatis punya akses menu ini */
       return '<button type="button" class="ak-ch mn' + (on ? ' on' : '') + lk + '" data-act="usak" data-a="' + m[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + (on ? ic('check', 'sm') : '') + m[1] + '</button>';
-    }).join('');
+    }).join('') +
+    '<span class="ak-sp"></span>' + (function () {
+      var on = !!o.lh && !o.admin && !o.apv;          /* Lihat saja: hanya Service & Laporan Kerusakan; berdiri sendiri (memilihnya mematikan akses lain) */
+      return '<button type="button" class="ak-ch sp lh' + (on ? ' on' : '') + '" data-act="usak" data-a="LIHAT" aria-pressed="' + (on ? 'true' : 'false') + '">' + (on ? ic('check', 'sm') : ic('search', 'sm')) + 'Lihat saja (Service &amp; Laporan Kerusakan)</button>';
+    })();
 }
 function akSum(o) {
+  if (o.lh && !o.admin && !o.apv) return 'Akses dipilih: <b>' + esc(akLb('LIHAT')) + '</b><br><small>Hanya bisa melihat halaman Service &amp; Laporan Kerusakan. Menu lain tidak tampil, tidak bisa menambah / mengubah laporan, dan tidak bisa mengerjakan pekerjaan.</small>';
   var v = akVal(o), work = !!akBase(o);
   return v ? 'Akses dipilih: <b>' + esc(akLb(v)) + '</b>' + (o.admin ? ' (bisa kelola user)' : '') + (o.asgh || o.gdg ? '<br><small>' + (o.asgh ? 'ASGH: ' : '') + (o.asgh ? 'membuat reservasi barang setelah di-ACC' : '') + (o.asgh && o.gdg ? '; ' : '') + (o.gdg ? 'Gudang: menyiapkan barang begitu mekanik mengajukan' : '') + '. Langsung diberi tahu saat ada reservasi baru. Otomatis boleh membuka menu Reservasi.</small>' : '') + (o.apv ? '<br><small>Approval: melihat dan menyetujui pekerjaan yang sudah selesai (Group Head / Section Head), termasuk menu Reservasi dan Laporan service.' + (work ? '' : ' Tidak bisa mengerjakan pekerjaan.') + '</small>' : (!work && !o.admin ? '<br><small>Hanya bisa membuka menu yang dipilih, tidak bisa mengerjakan pekerjaan.</small>' : '')) : 'Belum ada akses dipilih. Klik satu atau lebih tombol di atas.';
 }
@@ -738,7 +750,7 @@ setInterval(function () { if (!document.hidden && S.view.indexOf('jam') === 0 &&
 /* ---------- Beranda: papan "Monitoring Service Bengkel" (realtime dari input mekanik dan pengawas) ---------- */
 var MON_POOL = 'POOL MARGASATWA';
 var MON_MS = window.BKA_MON_MS || 10000;
-var MON_J = { teknik: 'Teknik', ki: 'Keindahan', ck: 'Corrective (CK)', tb: 'Pengerjaan Cat', pem: 'Tabrak PEM', las: 'Las / Ketok', cs: 'Supporting (CS)' };
+var MON_J = { teknik: 'Teknik', ki: 'Keindahan', ck: 'Corrective (CK)', tb: 'Pengerjaan Cat', pem: 'Tabrak PEM', las: 'Las / Ketok', cs: 'Supporting (CS)', bm: 'Bantuan Mekanik' };
 var MON_Q = { teknik: 'Teknik', ki: 'Keindahan', ck: 'CK', tb: 'Cat', pem: 'PEM', las: 'Las' };
 function monJenis(r) { var b = MON_J[r.j] || r.j || '-'; return (r.j === 'teknik' || r.j === 'ki') && r.sv ? b + ' ' + r.sv : b; }
 function monDur(m) { return m == null || m === '' ? '-' : (m < 180 ? m + ' menit' : jamTxt(m)); }
@@ -768,8 +780,8 @@ function monSnapLoad() {
 /* pekerjaan dari HP ini yang belum terkonfirmasi server (atau baru dikonfirmasi < 20 detik) dalam bentuk baris Monitor */
 function monLocal() {
   var d = S.mon.d || todayIso(), now = Date.now(), out = [];
-  (S.pk.job ? [S.pk.job] : []).concat(S.pk.q || []).forEach(function (x) {
-    if (!x || !x.id || !x.n || !x.j || !x.s || x.cf || x.rv || x.err || isoOf(new Date(x.s)) !== d) return;
+  pkAll().forEach(function (x) {
+    if (!x || !x.id || !x.n || !x.j || x.j === 'bm' || !x.s || x.cf || x.rv || x.err || isoOf(new Date(x.s)) !== d) return;
     if (!(pkPending(x) || (x.okAt && now - x.okAt < 20000))) return;
     var o = { id: x.id, n: String(x.n).toUpperCase(), j: x.j, nm: x.un || meNama(), s: hm(x.s), e: '', m: null };
     if (x.sv) o.sv = x.sv;
@@ -933,6 +945,7 @@ function monUi() {
 }
 function monFetch(force, soon) {
   var M = S.mon;
+  if (isLh()) return Promise.resolve();          /* Lihat saja: papan Monitoring tidak dibuka */
   if (M.busy && Date.now() - M.busy < 30000) { if (soon) M.again = 1; return Promise.resolve(); }          /* soon = tepat setelah ada input: bila pengambilan sebelumnya masih jalan, ulangi sesudah selesai supaya hasilnya terbaru */
   M.busy = Date.now();
   return gs('getMonitor', [M.h || '', !!force]).then(function (r) {
@@ -1084,7 +1097,7 @@ function ljHist(i) {
     '<div class="lj-hl">' + jobs.map(function (r) {
       var k = r.c.indexOf(' - '), n = k > 0 ? r.c.slice(0, k) : r.c, js = k > 0 ? r.c.slice(k + 3) : '', done = r.e !== '' && r.m != null, tdr = r.st === 'Tunda', src = null;
       if (r.lf) R.rows.forEach(function (x) { if (x.id === r.lf) src = x; });
-      return '<div class="lj-hr"><span class="nchip">' + ic('car', 'sm') + esc(n || '-') + '</span><span class="pill ' + (/supporting/i.test(js) ? 'pk-cs' : /keindahan/i.test(js) ? 'pk-ki' : (/corrective/i.test(js) ? 'pk-ck' : (/tabrak/i.test(js) ? 'pk-tb' : 'pk-teknik'))) + '">' + esc(js || 'Service') + '</span>' +
+      return '<div class="lj-hr"><span class="nchip">' + ic('car', 'sm') + esc(n || '-') + '</span><span class="pill ' + (/bantuan/i.test(js) ? 'pk-bm' : /supporting/i.test(js) ? 'pk-cs' : /keindahan/i.test(js) ? 'pk-ki' : (/corrective/i.test(js) ? 'pk-ck' : (/tabrak/i.test(js) ? 'pk-tb' : 'pk-teknik'))) + '">' + esc(js || 'Service') + '</span>' +
         '<div class="tm">' + esc(r.s) + ' &ndash; ' + (done ? esc(r.e) : '<span class="lj-run" style="margin:0">Berjalan</span>') + '<span>' + (done ? '&middot; ' + jamTxt(r.m) : '') + '</span></div>' +
         (r.lf ? '<div class="lj-ap td">' + ic('clock', 'sm') + ' Meneruskan pekerjaan tunda' + (src ? ' dari ' + esc(src.nm) + ' (' + esc(src.s) + '&ndash;' + esc(src.e) + ')' : '') + '. Jam dimulai dari nol.</div>' : '') +
         (tdr ? '<div class="lj-ap td">' + ic('clock', 'sm') + ' Tunda' + (r.tc ? ': ' + esc(r.tc) : '') + '</div>' : '') +
@@ -1253,7 +1266,7 @@ function openLap(id) {
     '<dl class="kv"><dt>Keluhan</dt><dd>' + esc(r.k) + '</dd><dt>Waktu</dt><dd>' + esc(dLong(r.tg, r.jm)) + '</dd><dt>Lokasi</dt><dd>' + esc(r.lk || '-') + '</dd>' +
     '<dt>Pelapor</dt><dd>' + esc(r.pl || '-') + '</dd><dt>No Polisi</dt><dd>' + esc(m.p || '-') + '</dd><dt>Jenis</dt><dd>' + esc(m.j || '-') + '</dd>' +
     '<dt>Status</dt><dd><span class="pill st-' + esc(r.st) + '">' + esc(r.st) + '</span></dd></dl>' +
-    '<div style="color:var(--muted);font-size:13px">Ubah status:</div><div class="stbtns">' + btn('Baru') + btn('Dikerjakan') + btn('Selesai') + '</div>');
+    (isLh() ? '' : '<div style="color:var(--muted);font-size:13px">Ubah status:</div><div class="stbtns">' + btn('Baru') + btn('Dikerjakan') + btn('Selesai') + '</div>'));
 }
 function setStatus(id, st, el) {
   var cur = (S.data.lap || []).filter(function (x) { return x.id === id; })[0];
@@ -1318,8 +1331,11 @@ function canView(k) { return can(k) || isAdmin() || isApv(); }
 /* PKL (Jabatan berisi PKL, bukan Admin / Approval): hanya melihat ikon pekerjaan yang diberikan. Tanpa Dashboard, MDB, Part, Laporan, Reservasi, Master. Mulai kerja butuh ACC dulu. */
 function isPkl() { return !!(S.me && S.me.pkl && !S.me.admin && !S.me.apv); }
 var PKL_VIEWS = ['jobmek', 'jobpk', 'jobcs', 'nomo', 'ck', 'tb', 'pem', 'las', 'tbmenu', 'lc'];
+/* Lihat saja (akses LIHAT, bukan Admin / Approval): hanya halaman Service & Laporan Kerusakan (+ daftar Service Teknik / Keindahan). Tanpa menu lain, tanpa tombol tambah / ubah. */
+function isLh() { return !!(S.me && S.me.lh && !S.me.admin && !S.me.apv); }
+var LH_VIEWS = ['dash', 'teknik', 'ki'];
 function canIzin() { return !!(S.me && (S.me.izin || S.me.apv)); }          /* boleh meng-ACC izin mulai kerja PKL: Group Head / Section Head (Approval) atau akses IZINPKL */
-function homeView() { return apHome() ? 'appr' : (isPkl() ? 'jobmek' : (rsOpsOnly() && !Object.keys((S.me && S.me.jobs) || {}).length ? 'rsv' : 'mon')); }
+function homeView() { return isLh() ? 'dash' : apHome() ? 'appr' : (isPkl() ? 'jobmek' : (rsOpsOnly() && !Object.keys((S.me && S.me.jobs) || {}).length ? 'rsv' : 'mon')); }
 function canViewKd(kd) { return canView(kd === 'tb' ? 'cat' : kd); }
 function viewOnlyKd(kd) { return canViewKd(kd) && !canKd(kd); }
 /* akses menu: 'rsv' = Reservasi, 'ls' = Laporan Service. Admin dan Approval otomatis; sesi lama (sebelum ada pengaturan ini) tetap terbuka sampai cek akun berikutnya */
@@ -1368,13 +1384,103 @@ function vLogin() {
     '<button class="btn full" id="lg_go" data-act="login"' + (S.loginBusy ? ' disabled' : '') + '>' + (S.loginBusy ? 'Memeriksa...' : 'Masuk') + '</button>' +
     '<div class="lgerr" id="lg_err">' + esc(S.loginErr || '') + '</div><small>NIP belum terdaftar? Hubungi admin.</small></div></section>';
 }
-var PKJ = { teknik: 'Service Teknik', ki: 'Service Keindahan', ck: 'Corrective Kendaraan', tb: 'Tabrak', pem: 'Tabrak PEM', las: 'Tabrak Las', cs: 'Corrective Supporting' };
+var PKJ = { teknik: 'Service Teknik', ki: 'Service Keindahan', ck: 'Corrective Kendaraan', tb: 'Tabrak', pem: 'Tabrak PEM', las: 'Tabrak Las', cs: 'Corrective Supporting', bm: 'Bantuan Mekanik' };
 function pkNum(s) { return String(s || '').toUpperCase().replace(/[\s#]+/g, ''); }
 function pkJobSave() {
   try {
     if (S.pk.job) localStorage.setItem('bka_pkjob', JSON.stringify(S.pk.job)); else localStorage.removeItem('bka_pkjob');
     if (S.pk.q.length) localStorage.setItem('bka_pkq', JSON.stringify(S.pk.q)); else localStorage.removeItem('bka_pkq');
+    if (S.pk.bg.length) localStorage.setItem('bka_pkbg', JSON.stringify(S.pk.bg)); else localStorage.removeItem('bka_pkbg');
   } catch (e) {}
+}
+/* ---------- Beberapa pekerjaan sekaligus ----------
+   Petugas Cat (kolom Bagian di sheet Pengguna berisi "Cat", ditambah Devi) boleh memulai pekerjaan baru saat pekerjaan lain masih berjalan (mis. MWD111 berjalan, lalu mulai MWD222).
+   Pekerjaan yang sedang dibuka = S.pk.job. Yang lain tetap berjalan di S.pk.bg: jamnya terus dihitung dari jam mulainya dan dikirim ke sheet seperti biasa; dibuka lagi lewat daftar "Pekerjaan lain".
+   Corrective Supporting Cat spion / Cat cover dop: semua petugas boleh memasukkan beberapa No Mobil sekaligus. Mobil pertama = pekerjaan utama (S.pk.job), mobil lain = pengikut (gl = id pekerjaan utama) di S.pk.bg.
+   Pengikut ikut selesai bersama pekerjaan utama (jam mulai / selesai dan Keterangan sama); tiap mobil tetap satu baris di Laporan Jam Mekanik. */
+var PK_MULTI_NIP = ['14118'];          /* Deviana (Bagian Bekleding) diperlakukan sama dengan petugas Cat */
+var PK_MULTI_KD = ['tb', 'ck', 'pem', 'las', 'cs'];          /* jenis pekerjaan yang boleh dimulai saat pekerjaan lain masih berjalan */
+var CS_MULTI = ['Cat spion', 'Cat cover dop'];          /* CS yang boleh diisi beberapa No Mobil sekaligus */
+var CS_MAXM = 10;          /* maksimal mobil dalam satu isian (termasuk mobil pertama) */
+function pkMulti() {
+  var m = S.me; if (!m) return false;
+  return /(^|[^a-z])cat([^a-z]|$)/i.test(String(m.bagian || '')) || PK_MULTI_NIP.indexOf(String(m.nip || '').trim()) >= 0;
+}
+function pkAll() { return (S.pk.job ? [S.pk.job] : []).concat(S.pk.q || [], S.pk.bg || []); }          /* urutan penting: pekerjaan utama selalu sebelum pengikutnya */
+function pkById(id) { var L = pkAll(), i; for (i = 0; i < L.length; i++) if (L[i].id === id) return L[i]; return null; }
+function pkBgVis() { return (S.pk.bg || []).filter(function (x) { return !x.gl; }); }          /* pekerjaan lain yang tampil di daftar (pengikut CS tidak tampil sendiri) */
+/* true = pekerjaan baru TIDAK boleh dimulai karena pekerjaan lain masih berjalan */
+function pkBlock(cur, kd) {
+  if (!cur || cur.e) return false;
+  if (pkMulti() && !cur.cf && PK_MULTI_KD.indexOf(kd) >= 0) return false;
+  toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return true;
+}
+/* pekerjaan di layar digantikan pekerjaan baru: yang masih berjalan pindah ke latar belakang, yang sudah berhenti menunggu terkirim */
+function pkLeave(cur) {
+  if (!cur) return;
+  if (!cur.e && !cur.cf) { if (S.pk.bg.indexOf(cur) < 0) S.pk.bg.push(cur); }
+  else if (pkAnyPending(cur)) S.pk.q.push(cur);
+}
+/* latar belakang dibersihkan: yang berjalan / tunda istirahat (menunggu dilanjutkan) tetap; yang sudah berhenti ke antrean kirim; yang ditolak server dibuang */
+function pkBgPrune() {
+  var keep = [], now = Date.now();
+  (S.pk.bg || []).forEach(function (x) {
+    if (x.cf) return;
+    if (!x.e) { keep.push(x); return; }
+    if (x.td && x.brk && x.bwe && now - x.bwe < 6 * 3600000 && !x.gl) { keep.push(x); return; }
+    if (pkAnyPending(x)) S.pk.q.push(x);
+  });
+  S.pk.bg = keep;
+}
+function pkFollowers(lead) { return lead ? (S.pk.bg || []).filter(function (x) { return x.gl === lead.id; }) : []; }
+function pkLeadWait(f) { var L = f.gl ? pkById(f.gl) : null; return !!L && !L.ok && !L.cf; }          /* pengikut baru dikirim setelah pekerjaan utamanya tercatat (izin PKL dipakai pekerjaan utama) */
+function pkBgLbl(x) { return x.cs && x.cs.p ? x.cs.p : (x.ck ? KDC[kdOf(x)].t : PKJ[pkK(x)]); }
+function pkBgTime(x, now) { if (x.e && x.td) return x.brk ? (x.bwe && now >= x.bwe ? 'Istirahat selesai' : 'Istirahat') : 'Tunda'; return pkDur(pkEl(x, now)); }
+/* daftar pekerjaan lain yang masih berjalan di perangkat ini (+ pekerjaan di layar bila incFg) */
+function pkBgHtml(incFg) {
+  var L = pkBgVis(), fg = S.pk.job, now = Date.now(), h = '';
+  if (incFg && fg && !fg.e && !fg.cf && (L.length || pkMulti())) h += '<button class="pkbg-it on" data-act="ckopen"><span class="pkbg-n"><b>#' + esc(fg.n) + '</b><small>' + esc(pkBgLbl(fg)) + '</small></span><span class="pkbg-t" data-bgt="' + esc(fg.id) + '">' + pkBgTime(fg, now) + '</span><span class="go">Buka</span></button>';
+  L.forEach(function (x) {
+    var nf = pkFollowers(x).length;
+    h += '<button class="pkbg-it" data-act="pkswitch" data-a="' + esc(x.id) + '"><span class="pkbg-n"><b>#' + esc(x.n) + (nf ? ' +' + nf + ' mobil' : '') + '</b><small>' + esc(pkBgLbl(x)) + '</small></span><span class="pkbg-t' + (x.e && x.td ? ' td' : '') + '" data-bgt="' + esc(x.id) + '">' + pkBgTime(x, now) + '</span><span class="go">Buka</span></button>';
+  });
+  if (!h) return '';
+  return '<div class="pkbg"><div class="pkbg-h">' + ic('clock', 'sm') + ' Pekerjaan ' + (incFg ? 'yang sedang berjalan' : 'lain yang masih berjalan') + '</div>' + h + '</div>';
+}
+function pkBgTick() {
+  var ts = document.querySelectorAll('[data-bgt]'), i, x, now = Date.now();
+  for (i = 0; i < ts.length; i++) { x = pkById(ts[i].getAttribute('data-bgt')); if (x) { var t = pkBgTime(x, now); if (ts[i].textContent !== t) ts[i].textContent = t; } }
+}
+/* membuka pekerjaan lain yang berjalan di latar belakang: pekerjaan di layar (bila masih berjalan) pindah ke latar belakang */
+function pkSwitch(id) {
+  var i, nx = null;
+  for (i = 0; i < S.pk.bg.length; i++) if (S.pk.bg[i].id === id && !S.pk.bg[i].gl) { nx = S.pk.bg.splice(i, 1)[0]; break; }
+  if (!nx) return;
+  pkLeave(S.pk.job);
+  S.pk.job = nx; S.pk.n = ''; pkJobSave();
+  S.pk.sw = 1; go('jobpk'); S.pk.sw = 0;
+  pkSync();
+}
+/* pekerjaan utama CS selesai: mobil lain ikut selesai di jam yang sama dengan Keterangan yang sama */
+function pkFinGroup(j) {
+  if (!j || !j.gm || !j.gm.length) return;
+  (S.pk.bg || []).forEach(function (x) { if (x.gl === j.id && !x.e) { x.e = j.e; x.t = j.t; x.ap = null; } });
+  pkBgPrune();
+}
+/* "Salah tekan? Lanjutkan lagi": mobil lain ikut berjalan lagi (dibuat ulang bila sudah terkirim dan terhapus dari perangkat; server mencari barisnya lewat id) */
+function pkGroupReopen(j) {
+  if (!j || !j.gm || !j.gm.length) return;
+  j.gm.forEach(function (g) {
+    var x = pkById(g.id);
+    if (x) {
+      if (S.pk.q.indexOf(x) >= 0) S.pk.q.splice(S.pk.q.indexOf(x), 1);
+      if (S.pk.bg.indexOf(x) < 0) S.pk.bg.push(x);
+    } else {
+      x = { id: g.id, n: g.n, j: 'cs', s: j.s, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: '', lfi: null, u: j.u, un: j.un, cf: '', gl: j.id, cs: { p: j.cs.p, pl: g.pl || '', fr: 0 } };
+      S.pk.bg.push(x);
+    }
+    x.e = 0; x.td = 0; x.tc = ''; x.ap = null; x.t = '';
+  });
 }
 /* kirim ke sheet 'Laporan Jam Mekanik': tiap pengerjaan dikirim lengkap (id + jam mulai/selesai + pekerjaan tambahan); server mencari barisnya lewat id, jadi aman diulang.
    Approval TIDAK dikirim dari HP mekanik: hanya Group Head / Section Head (akun Approval) yang menyetujui; bila server menjawab locked + ap, pekerjaan ini sudah disetujui.
@@ -1412,15 +1518,15 @@ function pkSyncHtml(x) {
 function pkSyncUi() { var el = $('#pksync'); if (el && S.pk.job && S.view === 'jobpk') el.innerHTML = pkSyncHtml(S.pk.job); }
 function pkSync() {
   if (S.pk.busy) return;
-  var list = (S.pk.job ? [S.pk.job] : []).concat(S.pk.q), x = null, kind = '', i;
+  var list = pkAll(), x = null, kind = '', i;
   for (i = 0; i < list.length; i++) { if (pkCPending(list[i])) { x = list[i]; kind = 'c'; break; } }
-  if (!x) for (i = 0; i < list.length; i++) { if (pkPending(list[i])) { x = list[i]; kind = 'j'; break; } }
+  if (!x) for (i = 0; i < list.length; i++) { if (pkPending(list[i]) && !(list[i].gl && pkLeadWait(list[i]))) { x = list[i]; kind = 'j'; break; } }
   if (!x) for (i = 0; i < list.length; i++) { if (pkFPending(list[i])) { x = list[i]; kind = 'f'; break; } }
   if (!x) for (i = 0; i < list.length; i++) { if (pkPPending(list[i])) { x = list[i]; kind = 'p'; break; } }
   if (!x) return;
   S.pk.busy = true;
   function fin() {
-    S.pk.busy = false; S.pk.q = S.pk.q.filter(pkAnyPending); pkJobSave(); jbSoon();
+    S.pk.busy = false; S.pk.q = S.pk.q.filter(pkAnyPending); pkBgPrune(); pkJobSave(); jbSoon();
     if (kind === 'j' || kind === 'c') monSoon();          /* Monitor ikut diperbarui seketika (server sudah menyiapkan datanya) */
     if (x.cf && S.pk.job === x && S.view === 'jobpk') pkShow(); else { pkSyncUi(); pkPhUi(); }
   }
@@ -1442,7 +1548,9 @@ function pkSync() {
   } else if (kind === 'j') {
     var sg = pkSig(x), pay = { id: x.id, n: x.n, j: x.j, s: x.s, e: x.e || 0, u: x.u || '', lf: x.lf || '' };
     if (x.sv) pay.sv = x.sv;
+    if (x.bn) pay.bn = x.bn;          // Bantuan Mekanik: id permintaan yang diterima (server memeriksanya)
     if (x.j === 'cs' && x.cs && x.cs.p) pay.cp = x.cs.p;
+    if (x.gl && x.j === 'cs') pay.gl = x.gl;          // mobil lain dalam satu isian CS: izin PKL ikut pekerjaan utama
     if (x.e) { pay.t = x.j === 'cs' ? csTxt(x) : (x.t || ''); if (x.td) { pay.td = 1; pay.tc = x.tc || ''; } }
     if (x.j === 'ck' && x.ck && x.ck.kl) pay.kl = String(x.ck.kl).slice(0, 100);          // keluhan CK: server memakainya untuk aturan PKL tanpa ACC (ban / bocor / tambal)
     if (x.rv) pay.bt = 1;          // Cat salah klik dipindah ke Las: waktunya dibatalkan di Laporan Jam Mekanik
@@ -1489,7 +1597,184 @@ function pkTick() {
   var el = S.view === 'jobpk' ? $('#pktime') : (S.view === 'nomo' ? $('#pktime2') : null);
   if (el) el.innerHTML = pkTimeHtml(j);
 }
-setInterval(pkTick, 250);
+function pkTick2() { pkTick(); pkBgTick(); }
+setInterval(pkTick2, 250);
+
+/* ---------- Bantuan Mekanik (Service Teknik) ----------
+   Di halaman Service Teknik yang sedang berjalan (di bawah Selisih KM): pilih rekan Teknik + jenis bantuan -> tombol Bantuan. Rekan mendapat banner pemberitahuan
+   (walau sedang kerja atau tidak), mengetuknya, lalu menjawab Ya / Tidak. Ya: jam kerja bantuan rekan mulai berjalan (halaman "Bantuan Mekanik", jenis 'bm'),
+   pekerjaan rekan yang sedang berjalan ditunda otomatis (catatan "Ditunda: membantu ..."), dan setelah bantuan selesai bisa diteruskan lagi lewat daftar Tunda. */
+var BN_JENIS = ['Bantu turun kopling', 'Bantu pasang racksteer', 'Turun tangki', 'Blending minyak rem'];
+function bnNew() { return { list: null, jenis: BN_JENIS, lt: 0, lbusy: false, lerr: '', masuk: [], keluar: [], h: '', at: 0, busy: false, pn: '', pb: '', seen: {}, ask: null, abusy: false, sbusy: 0 }; }
+S.bn = bnNew();
+function bnReset() { S.bn = bnNew(); bnBanUi(); }
+function bnMsg(e) { var m = msg(e); return /Fungsi tidak dikenal|not a function|reading 'apply'/.test(m) ? 'Fitur Bantuan belum aktif di server. Tempel Code.gs terbaru di Apps Script, lalu Deploy > Kelola deployment > Edit > Versi baru.' : m; }
+function bnWant() { return !!S.me && S.auth === 'ok' && !!S.data && can('teknik'); }
+function bnPendingOut() { return S.bn.keluar.some(function (x) { return x.st === 'Menunggu'; }); }
+function bnActive(x, n) { return x.n === n && (x.st === 'Menunggu' || x.st === 'Diterima'); }
+function bnFetch(force) {
+  var B = S.bn; if (!bnWant() || B.busy) return Promise.resolve();
+  var gap = bnPendingOut() ? Math.min(5000, BN_POLL) : BN_POLL;
+  if (!force && Date.now() - B.at < gap) return Promise.resolve();
+  B.busy = true;
+  return gs('bantuanGet', [meNip(), B.h]).then(function (r) {
+    B.busy = false; B.at = Date.now();
+    if (r && r.ok && !r.same) bnApply(r);
+  }, function () { B.busy = false; B.at = Date.now(); });          /* gagal (sinyal / server lama): diam saja, dicoba lagi nanti */
+}
+var BN_POLL = window.BKA_BN_POLL_MS || 10000;
+setInterval(function () { if (!document.hidden) bnFetch(); }, Math.min(2500, BN_POLL));
+function bnApply(r) {
+  var B = S.bn, prev = {}, ids = {};
+  B.keluar.forEach(function (x) { prev[x.id] = x.st; });
+  B.masuk = r.masuk || []; B.keluar = r.keluar || []; B.h = r.h || '';
+  B.masuk.forEach(function (x) {
+    ids[x.id] = 1;
+    if (!B.seen[x.id]) { B.seen[x.id] = 1; toast(x.fn + ' perlu bantuan' + (x.sv ? ' untuk Service ' + x.sv : '') + ' (#' + x.n + '): ' + x.b); }
+  });
+  B.keluar.forEach(function (x) {
+    var p = prev[x.id]; if (!p || p === x.st) return;
+    if (x.st === 'Diterima') toast(x.tn + ' menerima permintaan bantuan Anda: ' + x.b);
+    else if (x.st === 'Ditolak') toast(x.tn + ' tidak bisa membantu saat ini', true);
+    else if (x.st === 'Selesai') toast(x.tn + ' selesai membantu');
+  });
+  if (B.ask && !ids[B.ask.id] && !B.abusy) { var m = $('#bn_yes'); if (m) { closeModal(); toast('Permintaan bantuan ini sudah tidak berlaku (dibatalkan atau kedaluwarsa).', true); } B.ask = null; }
+  bnBanUi(); bnUi();
+}
+/* banner pemberitahuan di atas layar: ketuk untuk menjawab */
+function bnBanUi() {
+  var el = $('#bn_ban'); if (!el) return;
+  var L = (S.me && S.bn.masuk) || [];
+  if (!L.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  var q = L[0];
+  el.innerHTML = '<button class="bnban-b" data-act="bnopen" data-a="' + esc(q.id) + '">' + ic('wrench') + '<span><b>' + esc(q.fn) + '</b> perlu bantuan' + (q.sv ? ' untuk <b>Service ' + esc(q.sv) + '</b>' : '') + ' &middot; #' + esc(q.n) + '<br><small>' + esc(q.b) + (L.length > 1 ? ' &middot; +' + (L.length - 1) + ' permintaan lagi' : '') + '</small></span><i class="go">Jawab</i></button>';
+  el.style.display = 'block';
+}
+function bnPausable() { return [S.pk.job].concat(S.pk.bg || []).filter(function (x) { return x && !x.e && !x.cf; }); }
+function bnRunBm() { return bnPausable().filter(function (x) { return x.j === 'bm'; })[0] || null; }
+function bnOpen(id) {
+  var q = null; S.bn.masuk.forEach(function (x) { if (x.id === id) q = x; });
+  if (!q) { toast('Permintaan ini sudah tidak ada.', true); bnFetch(true); return; }
+  S.bn.ask = q;
+  var run = bnPausable();
+  showModal('<div class="sh-head"><b id="bn_yes">Permintaan bantuan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(q.n) + '</b> <span class="pill pk-teknik">' + (q.sv ? 'Service ' + esc(q.sv) : 'Service Teknik') + '</span>' +
+    '<dl class="kv"><dt>Dari</dt><dd>' + esc(q.fn) + '</dd><dt>Bantuan</dt><dd>' + esc(q.b) + '</dd>' + (q.sv ? '<dt>Service</dt><dd>' + esc(q.sv) + '</dd>' : '') + '</dl></div>' +
+    '<div class="pkq">' + esc(q.fn) + ' perlu bantuan untuk ' + (q.sv ? 'Service ' + esc(q.sv) : 'Service Teknik') + ' (#' + esc(q.n) + '). Apakah Anda bisa membantu?' +
+    '<small>Jika Ya, jam kerja bantuan Anda mulai berjalan' + (run.length ? ' dan pekerjaan Anda yang sedang berjalan (' + run.map(function (x) { return '#' + esc(x.n); }).join(', ') + ') ditunda otomatis' : '') + '. Setelah selesai membantu, pekerjaan yang ditunda bisa dilanjutkan lagi.</small></div>' +
+    '<div class="pkyn"><button class="btn ghost" data-act="bnno" id="bn_no">Tidak</button><button class="btn pkdone" data-act="bnyes" id="bn_ya">' + ic('check') + ' Ya, saya bantu</button></div>');
+}
+function bnAnswer(ya) {
+  var B = S.bn, q = B.ask; if (!q || B.abusy) return;
+  if (ya) {
+    var cs = bnPausable().filter(function (x) { return x.j === 'cs' || x.gl; })[0], bmr = bnRunBm();
+    if (bmr) { toast('Selesaikan dulu bantuan #' + bmr.n + ' yang sedang berjalan, lalu terima bantuan ini.', true); return; }
+    if (cs) { toast('Pekerjaan Corrective Supporting #' + cs.n + ' tidak bisa ditunda. Selesaikan dulu, lalu terima bantuan ini.', true); return; }
+  }
+  var t0 = Date.now(), jid = 'J' + t0 + Math.random().toString(36).slice(2, 5);
+  B.abusy = true;
+  var yb = $('#bn_ya'), nb = $('#bn_no'); if (yb) yb.disabled = true; if (nb) nb.disabled = true;
+  gs('bantuanJawab', [{ u: meNip(), id: q.id, ya: !!ya, jid: ya ? jid : '' }]).then(function (r) {
+    B.abusy = false; B.ask = null; closeModal();
+    if (!r || r.ok === false) { toast((r && r.conflict) || 'Gagal menjawab permintaan bantuan.', true); bnFetch(true); return; }
+    B.masuk = B.masuk.filter(function (x) { return x.id !== q.id; }); bnBanUi();
+    if (!ya) { toast('Permintaan bantuan ditolak'); bnFetch(true); return; }
+    bnStart(q, jid, t0);
+  }, function (er) { B.abusy = false; var y2 = $('#bn_ya'), n2 = $('#bn_no'); if (y2) y2.disabled = false; if (n2) n2.disabled = false; toast('Gagal menjawab: ' + bnMsg(er), true); });
+}
+/* menerima: pekerjaan yang sedang berjalan ditunda otomatis, lalu jam bantuan mulai berjalan */
+function bnStart(q, jid, t0) {
+  var tc = ('Ditunda: membantu ' + q.fn + ' (' + q.b + ')').slice(0, 200), now = Date.now(), paused = [];
+  bnPausable().forEach(function (x) {
+    x.e = Math.max(now, x.s + 1000); x.td = 1; x.tc = tc; x.ap = null; x.brk = 0; x.bwe = 0;
+    paused.push({ n: x.n, j: x.ck ? kdOf(x) : x.j, id: x.id });
+  });
+  pkLeave(S.pk.job); pkBgPrune();
+  S.pk.job = { id: jid, n: q.n, j: 'bm', s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: '', lfi: null, u: meNip(), un: meNama(), cf: '', bn: q.id, bnw: q.fn, bnl: q.b, bsv: q.sv || '', bnp: paused };
+  S.pk.n = ''; pkJobSave();
+  toast('Bantuan dimulai: ' + q.b + ' untuk ' + q.fn + (paused.length ? '. Pekerjaan Anda ditunda otomatis.' : ''));
+  go('jobpk'); pkSync(); bnFetch(true);
+}
+/* halaman jam bantuan (pembantu) */
+function pkShowBm(el, job) {
+  var m = S.mi[job.n] || {}, done = !!job.e, rows = '<dt>Mekanik</dt><dd>' + esc(job.un || meNama()) + '</dd><dt>Membantu</dt><dd><b>' + esc(job.bnw || '-') + '</b></dd><dt>Bantuan</dt><dd><b>' + esc(job.bnl || '-') + '</b></dd>' +
+    (job.bsv ? '<dt>Service</dt><dd>' + esc(job.bsv) + '</dd>' : '') + '<dt>Jenis</dt><dd>' + esc(m.j || '-') + '</dd>' +
+    '<dt>Waktu Mulai</dt><dd>' + hm(job.s) + ' &middot; ' + pkDmy(job.s) + '<div class="pktime" id="pktime">' + pkTimeHtml(job) + '</div></dd>', body;
+  var pz = (job.bnp || []).filter(function (x) { return x && x.n; });
+  if (job.cf) body = pkCfHtml(job);
+  else if (done) body = '<div class="pkx ro"><span>Catatan</span><p>' + esc(job.t || '-') + '</p></div><div class="pkfin">' + ic('check') + ' Bantuan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
+    (pz.length ? '<div class="pktd-h">Pekerjaan yang tadi ditunda: ' + pz.map(function (x) { return '<b>#' + esc(x.n) + '</b>'; }).join(', ') + '. Bisa dilanjutkan sekarang.</div><button class="btn full pkbtn" data-act="bnresume">' + ic('wrench') + ' Lanjutkan pekerjaan yang ditunda</button>' : '') +
+    '<button class="btn ghost full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>';
+  else body = '<div class="pkx"><label for="pk_t">Catatan <em>opsional</em></label><textarea id="pk_t" rows="2" maxlength="250" placeholder="Boleh dikosongkan">' + esc(job.t || '') + '</textarea></div>' +
+    '<button class="btn full pkbtn pkdone" id="pk_done" data-act="bndone">' + ic('check') + ' Bantuan Selesai</button>' +
+    '<div class="pktd-h">Jam bantuan berjalan sampai Anda menekan Bantuan Selesai.' + (pz.length ? ' Pekerjaan Anda yang ditunda (' + pz.map(function (x) { return '#' + esc(x.n); }).join(', ') + ') bisa dilanjutkan setelahnya.' : '') + '</div>';
+  el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(job.n) + '</b><span class="pill pk-bm">Bantuan Mekanik</span></div><dl class="kv">' + rows + '</dl>' + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
+}
+/* bagian "Bantuan mekanik" di halaman Service Teknik yang sedang berjalan (di bawah Selisih KM) */
+function bnSecOn(job) { return !!job && job.j === 'teknik' && !job.ck && !job.e && !job.cf && !job.ap && !!S.me && can('teknik'); }
+function bnSecHtml(job) { return bnSecOn(job) ? '<div class="pkbn" id="pk_bn">' + bnInner(job) + '</div>' : ''; }
+function bnLoadList(force) {
+  var B = S.bn; if (B.lbusy || !S.me) return;
+  if (!force && B.list !== null && Date.now() - B.lt < 300000) return;
+  B.lbusy = true;
+  gs('bantuanDaftar', [meNip()]).then(function (r) {
+    B.lbusy = false; B.lt = Date.now(); B.lerr = ''; B.list = (r && r.rows) || []; B.jenis = (r && r.jenis && r.jenis.length ? r.jenis : BN_JENIS); bnUi();
+  }, function (er) { B.lbusy = false; B.lt = Date.now(); B.lerr = bnMsg(er); bnUi(); });
+}
+function bnStTxt(x) {
+  if (x.st === 'Menunggu') return '<span class="w">Menunggu jawaban ' + esc(x.tn) + '</span>';
+  if (x.st === 'Diterima') return '<span class="ok">' + esc(x.tn) + ' menerima, sedang membantu' + (x.rt ? ' sejak ' + hm(x.rt) : '') + '</span>';
+  if (x.st === 'Selesai') return '<span class="ok">' + esc(x.tn) + ' selesai membantu</span>';
+  if (x.st === 'Ditolak') return '<span class="no">' + esc(x.tn) + ' tidak bisa membantu</span>';
+  if (x.st === 'Dibatalkan') return '<span class="mut">Dibatalkan</span>';
+  return '<span class="mut">Tidak dijawab (kedaluwarsa)</span>';
+}
+function bnInner(job) {
+  var B = S.bn, h = '<div class="pkbn-h">' + ic('wrench', 'sm') + ' Bantuan mekanik</div>';
+  if (B.list === null) { bnLoadList(); return h + (B.lerr ? '<div class="pkbn-i err">' + esc(B.lerr) + '</div>' : '<div class="pkbn-i">Memuat daftar rekan Teknik...</div>'); }
+  var mine = B.keluar.filter(function (x) { return x.n === job.n; }).slice(0, 5), act = {};
+  mine.forEach(function (x) { if (bnActive(x, job.n)) act[x.tnip.toLowerCase()] = x; });
+  h += '<div class="pkbn-sub">Pilih satu nama rekan, pilih jenis bantuan, lalu tekan Bantuan. Rekan langsung diberi pemberitahuan.</div>';
+  if (mine.length) h += '<div class="pkbn-st">' + mine.map(function (x) {
+    return '<div class="pkbn-sl">' + bnStTxt(x) + '<small>' + esc(x.b) + '</small>' + (x.st === 'Menunggu' ? '<button class="pkbn-x" data-act="bnbatal" data-a="' + esc(x.id) + '">Batalkan</button>' : '') + '</div>';
+  }).join('') + '</div>';
+  if (B.lerr) h += '<div class="pkbn-i err">' + esc(B.lerr) + '</div>';
+  if (!B.list.length) return h + '<div class="pkbn-i">Belum ada rekan Teknik lain yang terdaftar.</div>';
+  var pa = B.pn ? act[String(B.pn).toLowerCase()] : null;
+  if (pa || !B.list.some(function (u) { return u.nip === B.pn; })) { B.pn = ''; B.pb = ''; }
+  h += '<div class="pkbn-form">' +
+    '<select class="pkbn-sel" id="pk_bnn" data-bnsel="n" aria-label="Pilih nama rekan Teknik"><option value="">Pilih nama rekan...</option>' + B.list.map(function (u) {
+      var a = act[String(u.nip).toLowerCase()];
+      return '<option value="' + esc(u.nip) + '"' + (a ? ' disabled' : '') + (u.nip === B.pn ? ' selected' : '') + '>' + esc(u.nama) + (u.jb ? ' - ' + esc(u.jb) : '') + (a ? (a.st === 'Menunggu' ? ' (menunggu jawaban)' : ' (sedang membantu)') : '') + '</option>';
+    }).join('') + '</select>' +
+    '<select class="pkbn-sel" id="pk_bnb" data-bnsel="b" aria-label="Pilih jenis bantuan"' + (B.pn ? '' : ' disabled') + '><option value="">Pilih bantuan...</option>' + B.jenis.map(function (o) { return '<option value="' + esc(o) + '"' + (o === B.pb ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>' +
+    '<button class="btn pkbn-go" id="pk_bng" data-act="bnsend"' + (B.pn && B.pb && !B.sbusy ? '' : ' disabled') + '>' + (B.sbusy ? 'Mengirim...' : 'Bantuan') + '</button></div>';
+  return h;
+}
+function bnUi() {
+  var el = $('#pk_bn'), j = S.pk.job; if (!el || S.view !== 'jobpk' || !bnSecOn(j)) return;
+  var ae = document.activeElement; if (ae && ae.classList && ae.classList.contains('pkbn-sel') && el.contains(ae)) return;          /* sedang memilih: jangan ganggu */
+  el.innerHTML = bnInner(j);
+}
+function bnSend() {
+  var B = S.bn, j = S.pk.job, nip = B.pn, b = B.pb;
+  if (!bnSecOn(j) || !nip || !b || B.sbusy) return;
+  var u = (B.list || []).filter(function (x) { return x.nip === nip; })[0];
+  B.sbusy = 1; bnUi();
+  gs('bantuanMinta', [{ u: meNip(), n: j.n, sv: j.sv || pkSvCode(j.n) || '', to: nip, b: b }]).then(function (r) {
+    B.sbusy = 0; B.pn = ''; B.pb = '';
+    toast('Permintaan bantuan terkirim ke ' + ((r && r.to) || (u && u.nama) || 'rekan'));
+    bnFetch(true); bnUi();
+  }, function (er) { B.sbusy = 0; toast(bnMsg(er), true); bnUi(); });
+}
+function bnCancel(id) {
+  gs('bantuanBatal', [{ u: meNip(), id: id }]).then(function () { bnFetch(true); }, function (er) { toast(bnMsg(er), true); });
+}
+/* pekerjaan Service Teknik selesai / ditunda: permintaan bantuan yang belum dijawab dibatalkan */
+function bnCancelFor(job) {
+  if (!job || job.j !== 'teknik') return;
+  S.bn.keluar.forEach(function (x) { if (x.st === 'Menunggu' && x.n === job.n) bnCancel(x.id); });
+}
 
 /* ---------- Jam istirahat (mekanik dan PKL): 12:00-13:00 (shift pagi 07:00-15:00) dan 04:00-05:00 (shift 3 23:00-07:00) ----------
    5 menit sebelum istirahat muncul pertanyaan: pekerjaan ditunda? Jika ya, pekerjaan menjadi Tunda ("Tunda karena istirahat") dan jam berhenti.
@@ -1513,25 +1798,46 @@ function brkOurs() { return !!($('#brk_ask') || $('#brk_rs')); }
 function brkModalOpen() { var m = $('#modal'); return !!m && m.classList.contains('show'); }
 function brkCd(ms) { var s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return (m ? m + ' menit ' : '') + (s % 60) + ' detik'; }
 function brkHm(w) { return pkP2(new Date(w.s).getHours()) + ':' + pkP2(new Date(w.s).getMinutes()) + ' - ' + pkP2(new Date(w.e).getHours()) + ':' + pkP2(new Date(w.e).getMinutes()); }
+function brkElig(j) { return !!j && !j.e && !j.cf && !j.rv && !j.ap && j.j !== 'cs' && j.j !== 'bm' && !j.gl; }          /* pekerjaan berjalan yang ikut aturan istirahat (CS tidak ikut) */
+function brkPauseOne(j, at, w) {
+  if (at <= j.s) at = j.s + 1000;
+  j.e = at; j.td = 1; j.tc = BRK_TC; j.brk = 1; j.bwe = w.e; j.ap = null;
+}
+function brkLead() {          /* pekerjaan yang ditanyakan di jendela istirahat: yang di layar, bila tidak ada yang pertama di latar belakang */
+  if (brkElig(S.pk.job)) return S.pk.job;
+  var L = S.pk.bg.filter(brkElig); return L.length ? L[0] : null;
+}
 function brkTick() {
-  var j = S.pk.job; if (!j || j.cf || j.rv || j.ap || j.j === 'cs' || !S.me) return;
-  var now = Date.now();
-  if (!j.e) {
+  if (!S.me) return;
+  var now = Date.now(), ch = false;
+  S.pk.bg.forEach(function (x) {          /* pekerjaan di latar belakang: ditunda otomatis tepat saat istirahat mulai */
+    if (!brkElig(x)) return;
+    var wx = brkWinAfter(brkFrom(x)); if (!wx || now < wx.s) return;
+    brkPauseOne(x, wx.s, wx); ch = true;
+    toast('Jam istirahat: pekerjaan #' + x.n + ' ditunda otomatis, waktu berhenti');
+  });
+  if (ch) { pkJobSave(); pkSync(); if (S.view === 'jobpk') pkShow(); }
+  var j = brkLead();
+  if (j) {
     var w = brkWinAfter(brkFrom(j)); if (!w) return;
     if (now >= w.s) { brkPause(j, true); return; }          /* tidak dijawab sampai istirahat mulai: ditunda otomatis tepat jam istirahat */
     if (now >= w.s - BRK_PRE) {
       if (BRK.ask === w.s) { var cd = $('#brk_cd'); if (cd) cd.textContent = brkCd(w.s - now); }
       else if (!brkModalOpen()) brkAsk(j, w);
     }
-  } else if (j.td && j.brk && j.bwe && now >= j.bwe && BRK.rs !== j.id + ':' + j.bwe && !brkModalOpen()) brkAskResume(j);
+  }
+  var rj = null;          /* istirahat selesai: tanyakan lanjut untuk pekerjaan yang ditunda karena istirahat (di layar atau di latar belakang) */
+  [S.pk.job].concat(S.pk.bg).forEach(function (x) { if (!rj && x && !x.gl && x.e && x.td && x.brk && !x.cf && !x.ap && x.bwe && now >= x.bwe && BRK.rs !== x.id + ':' + x.bwe) rj = x; });
+  if (rj && !brkModalOpen()) brkAskResume(rj);
 }
 setInterval(brkTick, 1000);
 document.addEventListener('visibilitychange', function () { if (!document.hidden) brkTick(); });
+function brkOthers(j) { return [S.pk.job].concat(S.pk.bg).filter(function (x) { return x !== j && brkElig(x); }).length; }
 function brkAsk(j, w) {
   BRK.ask = w.s;
   showModal('<div class="sh-head"><b id="brk_ask">Sebentar lagi jam istirahat</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
-    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Jam istirahat</dt><dd>' + brkHm(w) + '</dd><dt>Mulai dalam</dt><dd id="brk_cd">' + brkCd(w.s - Date.now()) + '</dd></dl></div>' +
+    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd>' + (brkOthers(j) ? '<dt>Pekerjaan lain</dt><dd>' + brkOthers(j) + ' pekerjaan lagi ikut ditunda</dd>' : '') + '<dt>Jam istirahat</dt><dd>' + brkHm(w) + '</dd><dt>Mulai dalam</dt><dd id="brk_cd">' + brkCd(w.s - Date.now()) + '</dd></dl></div>' +
     '<div class="pkq">Apakah pekerjaan ditunda?<small>Jika ditunda, pekerjaan tercatat &quot;' + BRK_TC + '&quot; dan jam berhenti. Setelah istirahat Anda ditanya untuk melanjutkan, jam kerja meneruskan yang tadi. Jika tidak dijawab, pekerjaan ditunda otomatis saat istirahat mulai.</small></div>' +
     '<button class="btn full pkbtn pktunda-ok" data-act="brktunda">' + ic('clock') + ' Tunda karena istirahat</button>' +
     '<button class="btn ghost full pkbtn" data-act="brklanjut">Tetap lanjut kerja</button>');
@@ -1540,14 +1846,14 @@ function brkPause(j, auto) {
   if (!j || j.e || j.cf) return;
   var w = brkWinAfter(brkFrom(j)); if (!w) return;
   var at = auto ? w.s : Date.now();
-  if (at <= j.s) at = j.s + 1000;
-  j.e = at; j.td = 1; j.tc = BRK_TC; j.brk = 1; j.bwe = w.e; j.ap = null;
+  brkPauseOne(j, at, w);
+  if (!auto) [S.pk.job].concat(S.pk.bg).forEach(function (x) { if (x !== j && brkElig(x)) { var wx = brkWinAfter(brkFrom(x)); if (wx) brkPauseOne(x, Date.now(), wx); } });          /* "Tunda karena istirahat" berlaku untuk semua pekerjaan yang berjalan */
   if (brkOurs()) closeModal();
   pkJobSave(); pkShow(); pkSync();
   toast(auto ? 'Jam istirahat: pekerjaan #' + j.n + ' ditunda otomatis, waktu berhenti' : 'Pekerjaan ditunda karena istirahat, waktu berhenti');
 }
 function brkAskResume(j) {
-  BRK.rs = j.id + ':' + j.bwe;
+  BRK.rs = j.id + ':' + j.bwe; BRK.cur = j;
   showModal('<div class="sh-head"><b id="brk_rs">Jam istirahat selesai</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
     '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Jam kerja tadi</dt><dd>' + pkDur(pkEl(j, j.e)) + '</dd></dl></div>' +
@@ -1556,10 +1862,12 @@ function brkAskResume(j) {
     '<button class="btn ghost full pkbtn" data-act="closemodal">Nanti</button>');
   if (S.view === 'jobpk') pkShow();
 }
+function brkResume1(j, now) { j.bk = (j.bk || 0) + Math.max(0, now - j.e); j.rs = now; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.brk = 0; j.bwe = 0; }
 function brkResume(j) {
   if (!j || !j.td || !j.brk || j.ap || j.cf) return;
-  var now = Date.now();
-  j.bk = (j.bk || 0) + Math.max(0, now - j.e); j.rs = now; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.brk = 0; j.bwe = 0;
+  var now = Date.now(), bw = j.bwe;
+  brkResume1(j, now);
+  [S.pk.job].concat(S.pk.bg).forEach(function (x) { if (x && x !== j && !x.gl && x.td && x.brk && x.bwe === bw && !x.ap && !x.cf) brkResume1(x, now); });          /* semua pekerjaan yang ditunda di jendela istirahat yang sama ikut dilanjutkan */
   if (brkOurs()) closeModal();
   pkJobSave(); pkShow(); pkSync(); toast('Pekerjaan dilanjutkan, jam kerja meneruskan yang tadi');
 }
@@ -1573,12 +1881,12 @@ function brkActs(job, back) {
 
 function vPk() {
   var p = S.pk;
-  var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (p.job && p.job.ck ? KDC[kdOf(p.job)].t : (p.job && p.job.j === 'cs' ? 'Corrective Supporting' : 'Preventive Kendaraan')) + '</h2></div>';
+  var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (p.job && p.job.ck ? KDC[kdOf(p.job)].t : (p.job && p.job.j === 'cs' ? 'Corrective Supporting' : (p.job && p.job.j === 'bm' ? 'Bantuan Mekanik' : 'Preventive Kendaraan'))) + '</h2></div>';
   if (p.job) return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div id="pkres"></div></div>' + foot() + '</section>';
   if (!can('teknik') && !can('ki')) return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div class="vo-note">' + ic('search', 'sm') + '<span><b>Mode lihat.</b> Pekerjaan tunda mekanik tampil di bawah. Hanya mekanik yang bisa meneruskannya.</span></div><div id="pk_td">' + tdInner() + '</div></div>' + foot() + '</section>';
   var dl = (S.data.master || []).map(function (m) { return '<option value="' + esc(m.n) + '">' + esc(m.p + ' - ' + m.j) + '</option>'; }).join('');
   if (!p.jn) p.jn = can('teknik') && !can('ki') ? 'teknik' : (can('ki') && !can('teknik') ? 'ki' : '');   // hanya satu akses: langsung terpilih
-  return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div class="pkform">' +
+  return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div id="pkbgw">' + pkBgHtml() + '</div><div class="pkform">' +
     '<label>No Mobil<input id="pk_n" list="dl_pk" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="Cari / ketik No Mobil, contoh: MWD379" value="' + esc(p.n) + '"></label><datalist id="dl_pk">' + dl + '</datalist>' +
     '<div class="lab">Jenis Service</div><div class="segs' + (p.jn ? ' has' : '') + '">' +
     '<button type="button" class="seg s-teknik' + (can('teknik') ? '' : ' dis') + (p.jn === 'teknik' ? ' sel' : '') + '" data-act="pkjenis" data-a="teknik">Service Teknik</button>' +
@@ -1589,10 +1897,10 @@ function vPk() {
 /* ---------- Job Mekanik > Corrective Supporting (CS) ----------
    Pilih Pekerjaan (daftar gulir) -> nama petugas dan jabatan terisi otomatis -> Nomor Mobil diisi manual (Perawatan mojul: Nomor Plat) -> Kerjakan -> tanya "Apakah Anda akan mengerjakan unit ini?" -> waktu mulai.
    Keterangan wajib diisi dulu baru Pengerjaan Selesai. Tetap menunggu approval Group Head / Section Head. Tercatat di Laporan Jam Mekanik (jenis Corrective Supporting). */
-var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambah ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop', 'Rebuild Spare part (RO)'];
-/* laporan CK yang keluhannya memuat kata ban / bocor / tambal: PKL langsung mulai, tanpa ACC (aturan yang sama ada di server: IZIN_BEBAS_CK) */
-function izinBebasCk(kl) { return /(^|[^a-z])ban(nya|2)?(?![a-z])|bocor|tambal/i.test(String(kl || '')); }
-function izinBebas(p) { return /^(tambah|tambal) ban$/i.test(String(p || '').trim()); }          /* CS Tambah ban: PKL langsung mulai, tanpa ACC */
+var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambal ban', 'Ganti lampu', 'Bubut', 'Cat spion', 'Cat cover dop', 'Rebuild Spare part (RO)', 'Proyek lainnya'];
+/* laporan CK yang keluhannya memuat kata ban / iot (iyot) / bocor / tambal: PKL langsung mulai, tanpa ACC (aturan yang sama ada di server: IZIN_BEBAS_CK) */
+function izinBebasCk(kl) { return /(^|[^a-z])(ban|iy?ot)(nya|2)?(?![a-z])|bocor|tambal/i.test(String(kl || '')); }
+function izinBebas(p) { return /^(tambah|tambal) ban$/i.test(String(p || '').trim()); }          /* CS Tambal ban (ejaan lama Tambah ban tetap dikenali): PKL langsung mulai, tanpa ACC */
 function csModul() { return S.cs.p === CSJ[0]; }
 function csKey(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 /* isian Nomor Mobil / Nomor Plat -> mobil di Master kendaraan: { n, pl, jn } atau null */
@@ -1614,25 +1922,58 @@ function csResHtml() {
   if (csModul()) return '<div class="empty">Nomor plat minimal 3 huruf / angka.</div>';
   return '<div class="empty">No Mobil <b>' + esc(raw) + '</b> tidak ditemukan di Master kendaraan.</div>';
 }
+/* Cat spion / Cat cover dop: beberapa No Mobil dalam satu isian. Hasil: { f: mobil pertama, ex: mobil tambahan yang benar, bad: ada isian yang salah / dobel } */
+function csMulti() { return CS_MULTI.indexOf(S.cs.p) >= 0; }
+function csCars() {
+  var f = csFind(), out = { f: f, ex: [], bad: false }, seen = {};
+  if (!f || !csMulti()) return out;
+  seen[f.n] = 1;
+  (S.cs.m || []).forEach(function (v) {
+    var raw = String(v || '').trim(); if (!raw) return;
+    var n = pkNum(raw), m = S.mi[n];
+    if (!m || seen[n]) { out.bad = true; return; }
+    seen[n] = 1; out.ex.push({ n: n, pl: m.p || '', jn: m.j || '' });
+  });
+  return out;
+}
+function csMresHtml(i) {
+  var raw = String((S.cs.m || [])[i] || '').trim(), n, m, k;
+  if (!raw) return '';
+  n = pkNum(raw); m = S.mi[n];
+  if (!m) return '<div class="empty">No Mobil <b>' + esc(raw) + '</b> tidak ditemukan di Master kendaraan.</div>';
+  if (csFind() && csFind().n === n) return '<div class="empty">No Mobil <b>' + esc(n) + '</b> sama dengan mobil pertama.</div>';
+  for (k = 0; k < i; k++) if (pkNum(S.cs.m[k]) === n) return '<div class="empty">No Mobil <b>' + esc(n) + '</b> sudah diisi di atas.</div>';
+  return '<div class="pkok">' + ic('check', 'sm') + ' #' + esc(n) + (m.j ? ' &middot; ' + esc(m.j) : '') + (m.p ? ' &middot; Plat ' + esc(m.p) : '') + '</div>';
+}
+function csMoreHtml() {
+  if (!csMulti()) return '';
+  var m = S.cs.m || [];
+  return '<div class="cs-more" id="cs_more"><div class="lab">Mobil lain <small>(boleh lebih dari 1, pekerjaan dan waktu sama)</small></div>' + m.map(function (v, i) {
+    return '<div class="cs-mrow"><input id="cs_m' + i + '" class="cs-mi" data-i="' + i + '" list="dl_cs" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="No Mobil ke-' + (i + 2) + ', contoh: MWD380" value="' + esc(v) + '"><button type="button" class="cs-mx" data-act="csmdel" data-a="' + i + '" aria-label="Hapus mobil">' + ic('x', 'sm') + '</button></div><div class="cs-mres" id="cs_mres' + i + '">' + csMresHtml(i) + '</div>';
+  }).join('') + (m.length + 1 < CS_MAXM ? '<button type="button" class="btn ghost full cs-madd" data-act="csmadd">' + ic('plus', 'sm') + ' Tambah mobil</button>' : '') + '</div>';
+}
+function csMresUi(i) { var el = $('#cs_mres' + i); if (el && S.view === 'jobcs') el.innerHTML = csMresHtml(i); }
+function csGoOk() { return !!csFind() && !csCars().bad; }
 function csRestHtml() {
   var C = S.cs, M = (S.data && S.data.master) || [], mod = csModul();
   if (!C.p) return '<div class="pkhint">Pilih pekerjaan dulu. Nama petugas dan jabatan terisi otomatis, lalu isi nomor mobil.</div>';
   var dl = M.map(function (m) { return mod ? (m.p ? '<option value="' + esc(m.p) + '">' + esc(m.n + ' - ' + (m.j || '')) + '</option>' : '') : '<option value="' + esc(m.n) + '">' + esc((m.p || '') + ' - ' + (m.j || '')) + '</option>'; }).join('');
   return '<dl class="kv cs-me"><dt>Nama petugas</dt><dd>' + esc(meNama()) + ' <small>(otomatis)</small></dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + ' <small>(otomatis)</small></dd></dl>' +
     '<label for="cs_n">' + (mod ? 'Nomor Plat' : 'Nomor Mobil') + '<input id="cs_n" list="dl_cs" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="' + (mod ? 'Ketik / cari nomor plat, contoh: B 1234 XYZ' : 'Isi manual, contoh: MWD379') + '" value="' + esc(C.n) + '"></label><datalist id="dl_cs">' + dl + '</datalist>' +
-    '<div id="cs_res">' + csResHtml() + '</div>' +
-    '<button class="btn full pkbtn" id="cs_go" data-act="csgo"' + (csFind() ? '' : ' disabled') + '>' + ic('wrench', 'sm') + ' Kerjakan</button>' +
+    '<div id="cs_res">' + csResHtml() + '</div>' + csMoreHtml() +
+    '<button class="btn full pkbtn" id="cs_go" data-act="csgo"' + (csGoOk() ? '' : ' disabled') + '>' + ic('wrench', 'sm') + ' Kerjakan</button>' +
     '<div class="pkhint">Setelah menekan Kerjakan, Anda ditanya dulu apakah akan mengerjakan unit ini. Jika ya, waktu mulai berjalan.</div>';
 }
 function csRestUi() { var el = $('#cs_rest'); if (el && S.view === 'jobcs') el.innerHTML = csRestHtml(); }
 function csResUi() {
   var r = $('#cs_res'), b = $('#cs_go'); if (!r || S.view !== 'jobcs') return;
-  r.innerHTML = csResHtml(); if (b) b.disabled = !csFind();
+  r.innerHTML = csResHtml(); if (b) b.disabled = !csGoOk();
+  (S.cs.m || []).forEach(function (v, i) { csMresUi(i); });
 }
 function vCs() {
   var C = S.cs;
   var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Corrective Supporting</h2></div>';
-  return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div class="pkform cs-form">' +
+  return sub + '<section class="pad">' + errBanner() + '<div class="pkwrap"><div id="pkbgw">' + pkBgHtml(true) + '</div><div class="pkform cs-form">' +
     '<label for="cs_p">Pekerjaan<select id="cs_p"><option value="">Pilih pekerjaan...</option>' + CSJ.map(function (x) { return '<option value="' + esc(x) + '"' + (x === C.p ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>' +
     '<div id="cs_rest">' + csRestHtml() + '</div></div></div>' + foot() + '</section>';
 }
@@ -1641,18 +1982,25 @@ function csTxt(x) { var c = x.cs || {}; return (c.p || 'Corrective Supporting') 
 function csKet(j) { return !!String(j.t || '').replace(/\s+/g, ' ').trim(); }
 function csDoneUi(j) { if (csModulJ(j)) { phDoneUi(j); return; } var b = $('#pk_done'), h = $('#pk_csh'), ok = csKet(j); if (b) b.disabled = !ok; if (h) h.style.display = ok ? 'none' : ''; }
 function csModulJ(j) { return !!j && j.j === 'cs' && !!j.cs && j.cs.p === CSJ[0]; }          /* Perawatan mojul: foto selesai minimal 1, maksimal 5 */
-function csBegin(f) {
+function csBegin(f, ex) {
   var cur = S.pk.job;
-  if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
-  if (cur && pkAnyPending(cur)) S.pk.q.push(cur);
-  var t0 = Date.now();
-  S.pk.job = { id: 'J' + t0 + Math.random().toString(36).slice(2, 5), n: f.n, j: 'cs', s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: '', lfi: null, u: meNip(), un: meNama(), cf: '', cs: { p: S.cs.p, pl: f.pl || '', fr: f.fr ? 1 : 0 } };
+  if (pkBlock(cur, 'cs')) return;
+  pkLeave(cur);
+  var t0 = Date.now(), used = {}, mkId = function () { var id; do { id = 'J' + t0 + Math.random().toString(36).slice(2, 5); } while (used[id]); used[id] = 1; return id; };
+  var mk = function (ff, id, gl) { return { id: id, n: ff.n, j: 'cs', s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: '', lfi: null, u: meNip(), un: meNama(), cf: '', gl: gl || undefined, cs: { p: S.cs.p, pl: ff.pl || '', fr: ff.fr ? 1 : 0 } }; };
+  var lead = mk(f, mkId());
+  if (ex && ex.length) {
+    lead.gm = [];
+    ex.forEach(function (g) { var fo = mk(g, mkId(), lead.id); lead.gm.push({ n: g.n, id: fo.id, pl: g.pl || '' }); S.pk.bg.push(fo); });
+  }
+  S.pk.job = lead;
   pkJobSave(); go('jobpk'); pkSync();
 }
 function pkShowCs(el, job) {
   var cs = job.cs || {}, m = S.mi[job.n] || {}, done = !!job.e, mod = csModulJ(job);
   var rows = '<dt>Pekerjaan</dt><dd><b>' + esc(cs.p || '-') + '</b></dd><dt>Nama petugas</dt><dd>' + esc(job.un || meNama()) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' +
     (cs.fr ? '' : '<dt>No Mobil</dt><dd>#' + esc(job.n) + (m.j ? ' &middot; ' + esc(m.j) : '') + '</dd>') + (cs.pl ? '<dt>Nomor Plat</dt><dd>' + esc(cs.pl) + '</dd>' : '') +
+    (job.gm && job.gm.length ? '<dt>Mobil lain</dt><dd>' + job.gm.map(function (g) { return '#' + esc(g.n); }).join(', ') + '<br><small class="mut">Dikerjakan bersamaan, selesai bersamaan (' + (1 + job.gm.length) + ' mobil)</small></dd>' : '') +
     '<dt>Waktu Mulai</dt><dd>' + hm(job.s) + ' &middot; ' + pkDmy(job.s) + '<div class="pktime" id="pktime">' + pkTimeHtml(job) + '</div></dd>';
   var ph = mod ? '<div class="pkph" id="pk_ph">' + pkPhHtml(job) + '</div>' : '', body;
   if (job.cf) body = pkCfHtml(job);
@@ -1802,7 +2150,16 @@ function pkAppHtml(j) {
   var need = fk && !j.fs ? 'Isi dan simpan Form Fokus dulu agar bisa disetujui.' : ph && !phOk(j) ? (j.ck || csModulJ(j) ? 'Masukkan minimal ' + phMin(j) + ' ' + phLb(j) + ' dulu agar bisa disetujui.' : 'Lengkapi ' + PHS.length + ' ' + phLb(j) + ' dulu agar bisa disetujui.') : '';
   return '<div class="pkapp wait">' + ic('shield') + '<div><b>Menunggu approval</b><small>Waktu sudah berhenti. ' + (need || 'Pekerjaan ini menunggu persetujuan Group Head / Section Head.') + '</small>' + ns + '</div></div>';
 }
-function pkShow() {
+/* di bawah / di atas kartu pekerjaan: daftar pekerjaan lain yang berjalan dan tombol pekerjaan baru (petugas Cat) */
+function pkExtraUi() {
+  var el = $('#pkres'), j = S.pk.job; if (!el || !j) return;
+  var strip = pkBgHtml(), add = '';
+  if (pkMulti() && !j.e && !j.cf && !j.gl && PK_MULTI_KD.indexOf(j.ck ? kdOf(j) : j.j) >= 0) add = '<button class="btn ghost full pkbtn pkadd" data-act="pkadd">' + ic('plus') + ' Tambah pekerjaan baru <small>(pekerjaan ini tetap berjalan)</small></button>';
+  if (strip) el.insertAdjacentHTML('afterbegin', strip);
+  if (add) el.insertAdjacentHTML('beforeend', add);
+}
+function pkShow() { pkShowMain(); pkExtraUi(); }
+function pkShowMain() {
   var el = $('#pkres'); if (!el || !S.data) return;
   var p = S.pk, job = p.job;
   if (!job) {
@@ -1814,6 +2171,7 @@ function pkShow() {
   }
   if (job.ck) return pkShowCk(el, job);
   if (job.j === 'cs') return pkShowCs(el, job);
+  if (job.j === 'bm') return pkShowBm(el, job);
   var n = job.n, j = job.j === 'ki' ? 'ki' : 'teknik', jt = PKJ[j], m = S.mi[n] || {}, done = !!job.e;
   var r = S.svc[j === 'ki' ? 'ki' : 'teknik'].filter(function (x) { return x.n === n; })[0];
   var lim = S.svc_lim[j], lab = (lim < 0 ? '- ' + fmt(Math.abs(lim)) : fmt(lim)) + ' KM';
@@ -1838,7 +2196,7 @@ function pkShow() {
         (phOn(job) ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>' : (fkOn(job) ? '<div class="pkfs-hint" id="pk_fkh"' + (fkGo(job) ? ' style="display:none"' : '') + '>' + esc(fkHint(job)) + '</div>' : '')) +
         '<button class="btn ghost full pkbtn pktunda" data-act="pktunda">' + ic('clock') + ' Tunda</button><div class="pktd-h">Belum selesai? Tekan Tunda: waktu berhenti dan pekerjaan bisa dilanjutkan mekanik lain.</div>');
   el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(n) + '</b><span class="pill pk-' + j + '">' + jt + '</span></div>' +
-    '<dl class="kv">' + rows + '</dl>' + pkLfHtml(job) + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
+    '<dl class="kv">' + rows + '</dl>' + bnSecHtml(job) + pkLfHtml(job) + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
 }
 
 /* ---------- Foto Kendaraan (menggantikan Form Fokus pada Service Keindahan; Service Teknik tetap Form Fokus) ----------
@@ -1855,7 +2213,7 @@ var PHM = {};                       /* data foto di memori: kunci "idPengerjaan:
 function phOn(j) { return !!j && (csModulJ(j) || (j.ck ? kdOf(j) === 'las' : j.j === 'ki')); }          /* pengerjaan yang memakai 6 foto: Service Keindahan (Foto Kendaraan) dan Las (Foto Selesai Ketok). Service Teknik memakai Form Fokus */
 function fkGo(j) { return !fkOn(j) || !!j.fs; }          /* Service Teknik: Pengerjaan Selesai baru boleh ditekan setelah Form Fokus tersimpan (wajib) */
 function fkHint(j) { return j.fcl && !j.fs ? 'Form Fokus mekanik sebelumnya sedang dimuat. Tombol Pengerjaan Selesai aktif sesudahnya.' : 'Form Fokus wajib diisi dan disimpan dulu. Tombol Pengerjaan Selesai aktif setelah Form Fokus tersimpan.'; }
-function fkOn(j) { return !!j && !j.ck && j.j !== 'ki' && j.j !== 'cs'; }          /* Service Teknik: Form Fokus (Form Pengukuran Servis), tanpa foto kendaraan */
+function fkOn(j) { return !!j && !j.ck && j.j !== 'ki' && j.j !== 'cs' && j.j !== 'bm'; }          /* Service Teknik: Form Fokus (Form Pengukuran Servis), tanpa foto kendaraan */
 function phLb(j) { return csModulJ(j) ? 'foto perawatan mojul' : j && j.ck ? 'foto selesai ketok' : 'foto kendaraan'; }
 function phLbC(j) { return csModulJ(j) ? 'Foto perawatan mojul' : j && j.ck ? 'Foto selesai ketok' : 'Foto kendaraan'; }
 function phNm(j) { return csModulJ(j) ? 'Foto Perawatan Mojul' : j && j.ck ? 'Foto Selesai Ketok' : 'Foto Kendaraan'; }
@@ -2071,7 +2429,7 @@ function ckFetch(kd, d, force, quiet) {
 }
 /* ambil daftar hari ini di latar belakang (tanpa menunggu pengguna menekan ikon CK/Tabrak), satu per satu */
 function ckWarm() {
-  if (document.hidden || !S.data || S.loading || S.polling) return;
+  if (document.hidden || !S.data || S.loading || S.polling || isLh()) return;          /* Lihat saja: daftar pekerjaan tidak dibuka, tidak perlu diambil */
   var d = todayIso();
   ['ck', 'tb', 'pem', 'las'].forEach(function (kd, i) {
     var C = S[kd];
@@ -2088,7 +2446,7 @@ function ckRowOf(kd, k) {
 }
 /* pengerjaan di perangkat ini (yang sedang berjalan atau masih menunggu terkirim) menang atas status dari server */
 function ckJobOf(kd, k) {
-  var list = (S.pk.job ? [S.pk.job] : []).concat(S.pk.q), i;
+  var list = pkAll(), i;
   var best = null;
   for (i = 0; i < list.length; i++) if (list[i].ck && kdOf(list[i]) === kd && list[i].ck.k === k && !list[i].cf && !list[i].rv && (!best || list[i].s > best.s)) best = list[i];   // sesi terbaru yang menang
   return best;
@@ -2148,7 +2506,7 @@ function tbFsStatic(fs) {
 }
 /* foto selesai sebuah laporan Tabrak: pengerjaan di perangkat ini menang atas data dari server */
 function tbFsFor(k) {
-  var list = (S.pk.job ? [S.pk.job] : []).concat(S.pk.q), i, r = ckRowOf('tb', k);
+  var list = pkAll(), i, r = ckRowOf('tb', k);
   for (i = 0; i < list.length; i++) if (list[i].ck && kdOf(list[i]) === 'tb' && list[i].ck.k === k && pkFsOf(list[i]).length) return pkFsOf(list[i]);
   return r && r.fs ? r.fs : [];
 }
@@ -2203,7 +2561,7 @@ function ckRow(kd, r) {
       (vo ? '' : '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan</button>');
   }
   else if (s.s === 'other') act = '<span class="ck-bd run">' + ic('wrench', 'sm') + ' Sedang dikerjakan oleh ' + (s.self ? 'Anda (perangkat lain)' : esc(s.who)) + (r.js ? ' sejak ' + esc(r.js) : '') + '</span>' +
-    (s.self && pkIdMs(r.pid) && !vo ? '<button class="btn ck-go" data-act="cktake" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan di perangkat ini</button>' : '');
+    (s.self && pkIdMs(r.pid) && !vo ? '<button class="btn ck-go" data-act="cktake" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan di perangkat ini</button>' + (S.pk.job && !S.pk.job.e && S.pk.job.n && !pkMulti() ? '<div class="ck-lh">Pengerjaan #' + esc(S.pk.job.n) + ' masih berjalan di perangkat ini. Tunda atau selesaikan dulu, lalu tekan Lanjutkan.</div>' : '') : '');
   else if (s.mine) act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai oleh Anda &middot; ' + hm(j.s) + '&ndash;' + hm(j.e) + '</span>' + (S.pk.job === j ? '<button class="btn ghost ck-see" data-act="ckgo" data-a="' + k + '"' + b + '>Lihat</button>' : '');
   else act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai oleh ' + esc(s.who) + (r.js && r.je ? ' &middot; ' + esc(r.js) + '&ndash;' + esc(r.je) : '') + '</span>';
   if (tb) return '<div class="ck-tr st-' + s.s + '"><div class="ck-no">' + r.no + '</div>' + ckTg(r) +
@@ -2237,7 +2595,7 @@ function ckStats(kd) {
   var C = S[kd], R = C.rows[C.d], o = ckCounts(kd, R ? R.rows : []), j = S.pk.job, bar = '';
   if (j && !j.e && !j.cf) bar = '<button class="ck-runb" data-act="ckopen">' + ic('clock', 'sm') + '<span>Sedang berjalan: <b>#' + esc(j.n) + '</b> &middot; ' + (j.ck ? KDC[kdOf(j)].t : PKJ[pkK(j)]) + '</span><span class="go">Buka</span></button>';
   var chip = function (k, t, n) { return '<button class="ls-chip' + (C.st === k ? ' on' : '') + '" data-act="ckst" data-a="' + k + '" data-b="' + kd + '">' + t + ' <b>' + n + '</b></button>'; };
-  return bar + '<div class="ls-chips">' + chip('all', 'Semua', o.all) + chip('new', 'Belum', o['new']) + chip('run', 'Dikerjakan', o.run) + chip('tunda', 'Tunda', o.tunda) + chip('done', 'Selesai', o.done) + (kd === 'tb' ? chip('las', 'Di Las', o.las) : '') + '</div>';
+  return bar + pkBgHtml() + '<div class="ls-chips">' + chip('all', 'Semua', o.all) + chip('new', 'Belum', o['new']) + chip('run', 'Dikerjakan', o.run) + chip('tunda', 'Tunda', o.tunda) + chip('done', 'Selesai', o.done) + (kd === 'tb' ? chip('las', 'Di Las', o.las) : '') + '</div>';
 }
 /* ---------- Tabrak Cat: pilihan "No Registrasi" seperti Input Bengkel di aplikasi klaim ----------
    Isinya semua No Registrasi yang belum ada foto selesainya (akan dikerjakan / tunda). Begitu Cat mengirim foto selesai, No Registrasi itu hilang dari pilihan.
@@ -2329,7 +2687,7 @@ function ckPick(kd, r) {
 /* tanya dulu "apakah Anda akan mengerjakan armada ini?"; waktu baru berjalan setelah OK */
 function askStart(o, fn) {
   var cur = S.pk.job;
-  if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
+  if (pkBlock(cur, o.k)) return;
   S.pkgo = fn; S.pkgoO = o;
   var pk = isPkl() && !o.free;
   showModal('<div class="sh-head"><b>' + (o.td ? 'Lanjutkan Pekerjaan Tunda' : 'Mulai Pengerjaan') + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
@@ -2429,8 +2787,8 @@ function ckTakeGo() {
 }
 function ckBegin(kd, r, n, lf, td, ov) {          /* ov = { id, s }: meneruskan pengerjaan yang sudah tercatat di sheet (id dan jam mulai asli dipertahankan) */
   var cur = S.pk.job;
-  if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
-  if (cur && pkAnyPending(cur)) S.pk.q.push(cur);
+  if (pkBlock(cur, kd)) return;
+  pkLeave(cur);
   var t0 = ov ? ov.s : Date.now();
   S.pk.job = { id: ov ? ov.id : 'J' + t0 + Math.random().toString(36).slice(2, 5), n: n, j: kd, s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, cy: '',
     td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: meNip(), un: meNama(), cf: '',
@@ -2465,7 +2823,7 @@ function ckAp(x) { return x.e && x.ap ? x.ap : null; }
 function pkCSig(x) { return [x.e || 0, x.td ? 'T' + (x.tc || '') : '', x.e && !x.td ? (x.t || '') : '', x.lf || '', x.e && !x.td && x.pem ? 'P' : ''].join('|') + (x.bk ? '|K' + x.bk : ''); }
 function pkCPending(x) { return !!x.ck && !x.cf && !x.rv && x.cy !== pkCSig(x); }          /* x.rv: Cat dibatalkan dan armada dipindah ke Las (sudah ditangani server) */
 var TUNDA_CAT = ['Proses dempul', 'Proses Epoxy', 'Belum proses cat'];          /* pilihan saat Tabrak Cat ditunda; tersimpan di Catatan Tunda */
-function pkK(j) { return j.j === 'cs' ? 'cs' : j.j === 'ck' ? 'ck' : (j.j === 'tb' ? 'tb' : (j.j === 'las' ? 'las' : (j.j === 'pem' ? 'pem' : (j.j === 'ki' ? 'ki' : 'teknik')))); }
+function pkK(j) { return j.j === 'bm' ? 'bm' : j.j === 'cs' ? 'cs' : j.j === 'ck' ? 'ck' : (j.j === 'tb' ? 'tb' : (j.j === 'las' ? 'las' : (j.j === 'pem' ? 'pem' : (j.j === 'ki' ? 'ki' : 'teknik')))); }
 /* ---------- Tabrak: foto selesai dari aplikasi klaim (menggantikan isian Tindakan; wajib ada sebelum Pengerjaan Selesai) ---------- */
 function pkFsOf(j) { return j && j.ck && j.ck.fs ? j.ck.fs : []; }
 function pkFsBlockLc(job) {
@@ -3381,9 +3739,9 @@ function lsExport(rows, ym, meta, fname) {
 /* ---------- Approval (Group Head / Section Head) ----------
    Akun berakses Approval hanya melihat dan menyetujui pekerjaan yang sudah selesai (tidak bisa mengerjakan). Mekanik tidak punya tombol approval:
    HP mekanik hanya menunggu, lalu otomatis menampilkan "Disetujui" setelah salah satu dari mereka menyetujui (jobApproval / jawaban server). */
-var APJ = { teknik: 'Service Teknik', ki: 'Service Keindahan', ck: 'Corrective (CK)', tb: 'Tabrak Cat', las: 'Tabrak Las', pem: 'Tabrak PEM', cs: 'Corrective Supporting' };
-function apLbl(it) { return it.j === 'teknik' || it.j === 'ki' ? 'Pekerjaan Tambahan' : (it.j === 'cs' ? 'Pekerjaan' : (it.j === 'las' ? 'Keterangan' : 'Tindakan')); }
-function apTx(it) { return it.j === 'teknik' || it.j === 'ki' || it.j === 'cs' ? it.pt : it.dt; }
+var APJ = { teknik: 'Service Teknik', ki: 'Service Keindahan', ck: 'Corrective (CK)', tb: 'Tabrak Cat', las: 'Tabrak Las', pem: 'Tabrak PEM', cs: 'Corrective Supporting', bm: 'Bantuan Mekanik' };
+function apLbl(it) { return it.j === 'teknik' || it.j === 'ki' || it.j === 'bm' ? 'Pekerjaan Tambahan' : (it.j === 'cs' ? 'Pekerjaan' : (it.j === 'las' ? 'Keterangan' : 'Tindakan')); }
+function apTx(it) { return it.j === 'teknik' || it.j === 'ki' || it.j === 'cs' || it.j === 'bm' ? it.pt : it.dt; }
 function isApv() { return !!(S.me && S.me.apv); }
 function apHome() { return (isApv() || canIzin()) && !Object.keys((S.me && S.me.jobs) || {}).length; }      /* akun Approval murni: langsung ke halaman Approval */
 function apMine(it) { return !!it.nip && String(it.nip).toLowerCase() === String(meNip()).toLowerCase(); }
@@ -3986,10 +4344,21 @@ var ACT = {
     var C = S.cs, f = csFind();
     if (!C.p) { toast('Pilih pekerjaan dulu.', true); return; }
     if (!f) { toast(csModul() ? 'Isi nomor plat dulu (minimal 3 huruf / angka).' : 'No Mobil belum benar / tidak ada di Master kendaraan.', true); return; }
-    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p, free: izinBebas(C.p), q: 'Apakah Anda akan mengerjakan unit ini?',
-      info: '<dt>Pekerjaan</dt><dd>' + esc(C.p) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' + (f.jn ? '<dt>Jenis</dt><dd>' + esc(f.jn) + '</dd>' : '') + (f.pl ? '<dt>Nomor Plat</dt><dd>' + esc(f.pl) + '</dd>' : '') },
-      function () { csBegin(f); });
+    var X = csCars(), ex = X.ex;
+    if (X.bad) { toast('Ada No Mobil lain yang salah, dobel, atau tidak ada di Master kendaraan. Perbaiki atau hapus dulu.', true); return; }
+    var ls = ex.map(function (g) { return g.n; }).join(', ');
+    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p + (ex.length ? ' + ' + ex.length + ' mobil lain: ' + ls : ''), free: izinBebas(C.p), q: ex.length ? 'Apakah Anda akan mengerjakan ' + (1 + ex.length) + ' unit ini?' : 'Apakah Anda akan mengerjakan unit ini?',
+      info: '<dt>Pekerjaan</dt><dd>' + esc(C.p) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' + (f.jn ? '<dt>Jenis</dt><dd>' + esc(f.jn) + '</dd>' : '') + (f.pl ? '<dt>Nomor Plat</dt><dd>' + esc(f.pl) + '</dd>' : '') + (ex.length ? '<dt>Mobil lain</dt><dd>' + esc(ls) + '</dd>' : '') },
+      function () { csBegin(f, ex); });
   },
+  csmadd: function () {
+    if (!csMulti()) return;
+    var m = S.cs.m || (S.cs.m = []);
+    if (m.length + 1 >= CS_MAXM) { toast('Maksimal ' + CS_MAXM + ' mobil dalam satu isian.', true); return; }
+    m.push(''); csRestUi();
+    var el = $('#cs_m' + (m.length - 1)); if (el) el.focus();
+  },
+  csmdel: function (a) { var m = S.cs.m || []; m.splice(+a, 1); csRestUi(); },
   pkgoyes: function () { var f = S.pkgo, o = S.pkgoO; S.pkgo = null; closeModal(); if (!f) return; if (isPkl() && !(o && o.free)) izGate(o || {}, f); else f(); },
   izok: function (a) { izDecide(a, true); },
   iztolak: function (a) { izDecide(a, false); },
@@ -4038,16 +4407,33 @@ var ACT = {
       tx = pv + (tx ? ': ' + tx : '');
     }
     j.tc = tx.slice(0, 200);
-    j.e = Date.now(); j.td = 1; j.ap = null; pkJobSave(); closeModal(); pkShow(); pkSync(); toast('Pekerjaan ditunda, waktu berhenti');
+    j.e = Date.now(); j.td = 1; j.ap = null; bnCancelFor(j); pkJobSave(); closeModal(); pkShow(); pkSync(); toast('Pekerjaan ditunda, waktu berhenti');
   },
   pkcf: function () { ACT.pknew(); },
-  brktunda: function () { var j = S.pk.job; closeModal(); brkPause(j, false); },
+  bnopen: function (a) { bnOpen(a); },
+  bnyes: function () { bnAnswer(true); },
+  bnno: function () { bnAnswer(false); },
+  bnsend: function () { bnSend(); },
+  bnbatal: function (a) { bnCancel(a); },
+  bndone: function () {
+    var j = S.pk.job; if (!j || j.j !== 'bm' || j.e || j.cf) return;
+    var ta = $('#pk_t'); j.t = (ta ? ta.value : (j.t || '')).replace(/\s+/g, ' ').trim().slice(0, 250);
+    j.e = Date.now(); if (j.e <= j.s) j.e = j.s + 1000; j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Bantuan selesai, waktu berhenti');
+  },
+  bnresume: function () {
+    var j = S.pk.job; if (!j || j.j !== 'bm') return;
+    var f = (j.bnp || []).filter(function (x) { return x && x.n; })[0] || {}, kd = ['tb', 'pem', 'las', 'ck'].indexOf(f.j) >= 0 ? f.j : '';
+    if (!kd) { ACT.pknew(); return; }
+    if (pkAnyPending(j)) S.pk.q.push(j);
+    S.pk.job = null; S.pk.n = ''; pkJobSave(); go(kd); pkSync();
+  },
+  brktunda: function () { var j = brkLead(); closeModal(); brkPause(j, false); },
   brklanjut: function () {
-    var j = S.pk.job, w = j && !j.e ? brkWinAfter(brkFrom(j)) : null;
-    if (w) { j.bka = w.s; pkJobSave(); }
+    [S.pk.job].concat(S.pk.bg).forEach(function (j) { var w = brkElig(j) ? brkWinAfter(brkFrom(j)) : null; if (w) j.bka = w.s; });
+    pkJobSave();
     closeModal(); toast('Tetap lanjut kerja, jam terus berjalan');
   },
-  brkresume: function () { brkResume(S.pk.job); },
+  brkresume: function () { var j = S.pk.job; if (!(j && j.td && j.brk)) j = BRK.cur && S.pk.bg.indexOf(BRK.cur) >= 0 ? BRK.cur : null; brkResume(j); },
   nojob: function (a) { toast('Akun Anda tidak punya akses ke ' + a + '.', true); },
   pkdone: function () {
     var j = S.pk.job; if (!j || j.e || j.cf) return;
@@ -4105,7 +4491,7 @@ var ACT = {
       if (ta) { ta.classList.add('bad'); ta.focus(); try { ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
       return;
     }
-    j.e = Date.now(); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan selesai, waktu berhenti');
+    j.e = Date.now(); j.ap = null; pkFinGroup(j); bnCancelFor(j); pkJobSave(); pkShow(); pkSync(); toast(j.gm && j.gm.length ? 'Pengerjaan selesai untuk ' + (1 + j.gm.length) + ' mobil, waktu berhenti' : 'Pengerjaan selesai, waktu berhenti');
   },
   pkfscek: function () { pkFsCheck('manual'); },
   pemk: function (a) {
@@ -4197,7 +4583,7 @@ var ACT = {
   },
   pkresume: function () {
     var j = S.pk.job; if (!j || j.ap || j.cf || j.rv) return;
-    var lanjut = function () { if (S.pk.job !== j || j.ap) return; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.pem = 0; pkJobSave(); pkShow(); pkSync(); };
+    var lanjut = function () { if (S.pk.job !== j || j.ap) return; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.pem = 0; pkGroupReopen(j); pkJobSave(); pkShow(); pkSync(); };
     gs('jobApproval', [meNip(), [j.id]]).then(function (r) {          /* sudah disetujui Group Head / Section Head? maka dikunci */
       var a = r && r.ap && r.ap[j.id];
       if (a) { apApply(j, a, false); toast('Pekerjaan ini sudah disetujui ' + a.by + ', tidak bisa dilanjutkan lagi.', true); } else lanjut();
@@ -4292,22 +4678,23 @@ var ACT = {
   tbregref: function () { tbRegFetch(true); },
   ckst: function (a, b) { var kd = kdArg(b); S[kd].st = a; ckRefresh(kd); },
   ckopen: function () { if (S.pk.job) go('jobpk'); },
+  pkswitch: function (a) { pkSwitch(a); },
+  pkadd: function () { var j = S.pk.job; if (j) go(j.ck ? kdOf(j) : (j.j === 'cs' ? 'jobcs' : 'jobmek')); },
   ckgo: function (a, b) {
     var kd = kdArg(b), r = ckRowOf(kd, a); if (!r) return;
     if (!canKd(kd)) { toast('Akun Anda tidak punya akses ke ' + KDC[kd].t + '.', true); return; }
     var s = ckSt(kd, r);
-    if (s.s === 'tunda' && s.mine && s.job && s.job.brk && S.pk.job === s.job) { go('jobpk'); return; }          // tunda istirahat milik sendiri: dilanjutkan dari halaman pekerjaan (jam meneruskan)
+    if (s.s === 'tunda' && s.mine && s.job && s.job.brk && S.pk.job === s.job) { go('jobpk'); return; }
+    if (s.s === 'tunda' && s.mine && s.job && s.job.brk && !s.job.gl && S.pk.bg.indexOf(s.job) >= 0) { pkSwitch(s.job.id); return; }          // tunda istirahat milik sendiri: dilanjutkan dari halaman pekerjaan (jam meneruskan)
     if (s.s === 'tunda') {                       // meneruskan pekerjaan tunda: sesi baru, jam mulai dari nol
-      var cu = S.pk.job;
-      if (cu && !cu.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cu.n + ' yang sedang berjalan.', true); return; }
+      if (pkBlock(S.pk.job, kd)) return;
       if (!S.mi[s.n]) { ckPick(kd, r); return; }
       ckStart(kd, r, s.n, s.mine ? s.job.id : s.pid, { nm: s.who, m: s.mine ? Math.round((s.job.e - s.job.s) / 60000) : null });
       return;
     }
-    if (s.mine) { if (S.pk.job === s.job) go('jobpk'); return; }
+    if (s.mine) { if (S.pk.job === s.job) go('jobpk'); else if (s.job && !s.job.gl && S.pk.bg.indexOf(s.job) >= 0) pkSwitch(s.job.id); return; }
     if (s.s !== 'new') { toast('Laporan ini ' + (s.s === 'done' ? 'sudah selesai dikerjakan' : 'sedang dikerjakan') + ' oleh ' + s.who, true); ckFetch(kd, S[kd].d, true); return; }
-    var cur = S.pk.job;
-    if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
+    if (pkBlock(S.pk.job, kd)) return;
     if (!S.mi[s.n]) { ckPick(kd, r); return; }
     ckStart(kd, r, s.n);
   },
@@ -4316,14 +4703,13 @@ var ACT = {
     if (!canKd(kd)) { toast('Akun Anda tidak punya akses ke ' + KDC[kd].t + '.', true); return; }
     var s = ckSt(kd, r), cur = S.pk.job;
     if (s.s !== 'other' || !s.self || !pkIdMs(r.pid)) { toast('Status pekerjaan sudah berubah, memuat ulang.', true); ckFetch(kd, S[kd].d, true); return; }
-    if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
+    if (pkBlock(cur, kd)) return;
     ckTakeAsk(kd, r);
   },
   cktakeyes: function () { ckTakeGo(); },
   ckchg: function (a, b) {
     var kd = kdArg(b), r = ckRowOf(kd, a); if (!r || ckSt(kd, r).s !== 'new') return;
-    var cur = S.pk.job;
-    if (cur && !cur.e) { toast('Selesaikan atau tunda dulu pengerjaan #' + cur.n + ' yang sedang berjalan.', true); return; }
+    if (pkBlock(S.pk.job, kd)) return;
     ckPick(kd, r);
   },
   ckpick: function (a, b) {
@@ -4443,12 +4829,16 @@ var ACT = {
     closeMenu();
     var j = S.pk.job;
     if (j && !j.e && !j.cf) { toast('Selesaikan atau tunda dulu pengerjaan #' + j.n + ' sebelum keluar.', true); return; }
+    var jb = S.pk.bg.filter(function (x) { return !x.e && !x.cf; })[0];
+    if (jb) { toast('Selesaikan atau tunda dulu pengerjaan #' + jb.n + ' sebelum keluar.', true); return; }
     if (j) { if (pkAnyPending(j)) S.pk.q.push(j); S.pk.job = null; S.pk.n = ''; pkJobSave(); }
-    S.me = null; jbReset(); S.auth = 'login'; S.loginErr = ''; S.loginNip = ''; S.td = { rows: [], ssel: [], sel: [], loc: [], h: '', busy: false, err: '' }; S.users.rows = null; S.users.h = ''; S.ap.rows = null; S.ap.h = ''; S.ap.done = []; rsReset();
+    S.me = null; jbReset(); bnReset(); S.auth = 'login'; S.loginErr = ''; S.loginNip = ''; S.td = { rows: [], ssel: [], sel: [], loc: [], h: '', busy: false, err: '' }; S.users.rows = null; S.users.h = ''; S.ap.rows = null; S.ap.h = ''; S.ap.done = []; rsReset();
     meSave(); S.view = 'mon'; renderShell(); monFetch(); pkSync();
   },
   usak: function (a) {
     var o = S.users.ak; if (!o) return;
+    if (a === 'LIHAT') { o.lh = !o.lh; if (o.lh) { o.admin = false; o.apv = false; o.izin = false; o.rsv = false; o.ls = false; o.asgh = false; o.gdg = false; o.set = {}; } usAkUi(); return; }
+    if (o.lh) o.lh = false;          /* memilih akses lain mematikan Lihat saja */
     if (a === 'ASGH' || a === 'GUDANG') {
       var rk = a === 'ASGH' ? 'asgh' : 'gdg';
       if (o.admin) { o.admin = false; AK_JOBS.forEach(function (x) { o.set[x[0]] = 1; }); o.rsv = true; o.ls = true; o.asgh = true; o.gdg = true; o[rk] = false; }
@@ -4484,7 +4874,7 @@ var ACT = {
     var er = $('#us_err'), bad = function (m, id) { if (er) er.textContent = m; var f = $('#' + id); if (f) f.focus(); };
     if (!p.nama) return bad('Nama wajib diisi.', 'us_nama');
     if (!/^[A-Za-z0-9._-]{2,20}$/.test(p.nip)) return bad('NIP harus 2-20 karakter (huruf atau angka, tanpa spasi).', 'us_nip');
-    if (!p.akses) return bad('Pilih minimal satu akses: klik Teknik, Keindahan, Cat, CK, PS, CS, Las, PEM, Semua pekerjaan, Admin, Approval, Reservasi, atau Laporan service.', 'us_akg');
+    if (!p.akses) return bad('Pilih minimal satu akses: klik Teknik, Keindahan, Cat, CK, PS, CS, Las, PEM, Semua pekerjaan, Admin, Approval, Reservasi, Laporan service, atau Lihat saja.', 'us_akg');
     if (er) er.textContent = '';
     var btn = $('#us_save'); U.saving = true; if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
     gs('userSimpan', [meNip(), p]).then(function (r) {
@@ -4535,11 +4925,19 @@ document.addEventListener('input', function (e) {
   else if (/^fk_/.test(e.target.id || '')) { fkInput(e.target.id.slice(3), e.target.value, e.target); }
   else if (e.target.id === 'pk_t') { var jt = S.pk.job; if (jt && !jt.e) { jt.t = e.target.value; e.target.classList.remove('bad'); pkJobSave(); if (jt.ck && kdOf(jt) === 'las') phDoneUi(jt); if (jt.j === 'cs') csDoneUi(jt); } }
   else if (e.target.id === 'cs_n') { S.cs.n = e.target.value; csResUi(); }
+  else if (e.target.classList && e.target.classList.contains('cs-mi')) { var cmi = +e.target.getAttribute('data-i'); if (!S.cs.m) S.cs.m = []; S.cs.m[cmi] = e.target.value; csResUi(); }
 });
 document.addEventListener('focusout', function (e) { if (e.target && e.target.id === 'tb_reg' && S.tbreg.dirty) setTimeout(tbRegUi, 150); });
 document.addEventListener('change', function (e) {
+  if (e.target.classList && e.target.classList.contains('pkbn-sel')) {          /* Bantuan Mekanik: pilih nama rekan -> pilih jenis bantuan -> tombol Bantuan aktif */
+    var Bn = S.bn, bk = e.target.getAttribute('data-bnsel'), sb = $('#pk_bnb'), bg = $('#pk_bng');
+    if (bk === 'n') { Bn.pn = e.target.value; if (!Bn.pn) Bn.pb = ''; } else Bn.pb = e.target.value;
+    if (sb) { sb.disabled = !Bn.pn; if (!Bn.pn) sb.value = ''; }
+    if (bg) bg.disabled = !(Bn.pn && Bn.pb) || !!Bn.sbusy;
+    return;
+  }
   if (e.target.id === 'tb_reg') { tbRegPick(e.target.value); return; }
-  if (e.target.id === 'cs_p') { S.cs.p = e.target.value; S.cs.n = ''; csRestUi(); return; }
+  if (e.target.id === 'cs_p') { S.cs.p = e.target.value; S.cs.n = ''; S.cs.m = []; csRestUi(); return; }
   if (e.target.id === 'ap_kt' || e.target.id === 'ap_kq') { var ae = $('#ap_err'); if (ae) ae.textContent = ''; e.target.classList.remove('bad'); return; }
   if (/^(ck|tb|pem|las)_d$/.test(e.target.id || '')) {
     var cv = e.target.value, ct = todayIso(), kc = e.target.id.split('_')[0];
@@ -4573,14 +4971,14 @@ document.addEventListener('keydown', function (e) {
   var el = $('#' + id); if (!el) return;
   el.addEventListener('change', function () { var f = el.files && el.files[0]; if (f) phPick(f); el.value = ''; });
 });
-document.addEventListener('visibilitychange', function () { if (!document.hidden) { poll(); meCheck(); jbFetch(true); if (S.view === 'mon') monFetch(); if (kdView()) ckFetch(kdView(), S[kdView()].d); if (S.view === 'lc') lcFetch(false); } });
+document.addEventListener('visibilitychange', function () { if (!document.hidden) { poll(); meCheck(); jbFetch(true); bnFetch(true); if (S.view === 'mon') monFetch(); if (kdView()) ckFetch(kdView(), S[kdView()].d); if (S.view === 'lc') lcFetch(false); } });
 setInterval(function () { if (!document.hidden && S.view === 'lc' && S.data && !S.lc.busyS) lcFetch(false); }, POLL_MS);
 setInterval(poll, POLL_MS);
 
 /* ---------- start ---------- */
 S.jam.d = todayIso(); S.jam.rm = S.jam.d.slice(0, 7);
 (function () {   /* pekerjaan lama (sebelum ada login) di perangkat ini diberi pemilik = user yang sedang login */
-  var all = (S.pk.job ? [S.pk.job] : []).concat(S.pk.q), ch = false;
+  var all = pkAll(), ch = false;
   all.forEach(function (x) { if (x && !x.u && S.me && S.me.nip) { x.u = S.me.nip; x.un = x.un || S.me.nama; ch = true; } });
   if (ch) pkJobSave();
 })();
