@@ -203,7 +203,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-03 06:19';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-03 07:13';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -3554,7 +3554,7 @@ function rsChips(list, ex) {
 function rsJst(s) { return s === 'Berjalan' ? 'Sedang dikerjakan' : s === 'Tunda' ? 'Ditunda' : s === 'Selesai' ? 'Selesai dikerjakan' : ''; }
 function rsCandCard(c) {
   var tk = rsTeknik();
-  return '<div class="ap-card rs-card' + (c.tdk ? ' own' : ' ready') + '"><div class="ap-c1">' + nchip(c.n) + (c.ns ? '<span class="pill pk-ck">Nomor S belum ada</span>' : '<span class="pill pk-teknik">Service ' + esc(c.sv) + '</span>') + '<span class="ap-ago">' + esc(rsJst(c.jst)) + '</span></div>' +
+  return '<div class="ap-card rs-card' + (c.tdk ? ' own' : ' ready') + '"><div class="ap-c1">' + nchip(c.n) + (c.ns ? '<span class="pill pk-ck">Nomor S belum ada</span>' : '<span class="pill pk-teknik">Service ' + esc(c.sv) + '</span>') + '<span class="ap-ago">' + esc(pkDmy(c.lt || c.t0)) + ' ' + hm(c.lt || c.t0) + (rsJst(c.jst) ? '<br>' + esc(rsJst(c.jst)) : '') + '</span></div>' +
     '<div class="ap-c2"><b>' + esc(c.mk || '-') + '</b><span>' + esc(c.jn || '-') + '</span></div>' +
     '<div class="ap-tx"><small>' + (c.ns ? 'Kode servis belum ada di data SAP' : c.nk ? 'Jenis mobil belum dikenali' : 'Barang otomatis (' + c.it.length + ')') + '</small><div class="rs-chips">' + (c.ns ? '<span class="rs-none">Isi nomor S di form, barang otomatis muncul menyesuaikan</span>' : c.nk ? '<span class="rs-none">Isi barang secara manual</span>' : rsChips(c.it)) + '</div></div>' +
     (c.tdk ? '<div class="ap-st own">' + ic('lock', 'sm') + '<span>Anda menjawab: tidak reservasi. Masih bisa diubah.</span></div>' : '') +
@@ -3615,6 +3615,15 @@ function rsLapCard(d) {
       : rsPills(d) + (acc ? '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>' : '')) +
     (bt ? '<div class="rs-bts">' + bt + '</div>' : '') + '</div>';
 }
+/* tanggal Reservasi (berlaku untuk ketiga tab): ms termasuk tanggal yang dipilih? carry = yang masih menunggu tindakan ikut tampil di hari ini walau berasal dari hari sebelumnya */
+function rsInDay(ms, carry) {
+  var d0 = rsDayCur(), t0 = todayIso(), dd;
+  if (d0 === 'all') return true;
+  dd = isoOf(new Date(ms));
+  return dd === d0 || (!!carry && d0 === t0 && dd < t0);
+}
+function rsCandRows() { return (S.rs.cand || []).filter(function (c) { return rsInDay(c.lt || c.t0, !c.tdk); }); }          /* mobil yang belum dijawab terbawa ke hari ini; yang sudah dijawab Tidak hanya di tanggalnya */
+function rsPendRows() { return (S.rs.pend || []).filter(function (p) { return rsInDay(p.at, true); }); }          /* yang menunggu ACC tidak boleh hilang: terbawa ke hari ini */
 function rsDayCur() { var d = S.rs.day; return d === 'all' ? 'all' : (d || todayIso()); }
 /* isi tab Laporan: reservasi pada tanggal yang dipilih (default hari ini). Yang belum tuntas untuk peran ASGH / Gudang tetap muncul di hari ini walau dibuat kemarin. */
 function rsLapRows() {
@@ -3644,10 +3653,13 @@ function rsListHtml() {
   var R = S.rs, tab = rsTab(), body;
   if (R.err && !R.cand) return '<div class="empty">Gagal memuat Reservasi.<br><small>' + esc(R.err) + '</small></div>';
   if (!R.cand) return '<div class="empty">Memuat Reservasi...</div>';
-  if (tab === 'isi') body = R.cand.length ? '<div class="ap-list">' + R.cand.map(rsCandCard).join('') + '</div>'
-    : '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang perlu diisi</b>Mobil yang sedang Anda kerjakan di Service Teknik otomatis muncul di sini.</div>';
-  else if (tab === 'acc') body = R.pend.length ? '<div class="ap-list">' + R.pend.map(rsPendCard).join('') + '</div>'
-    : '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang menunggu ACC</b>Reservasi yang diajukan mekanik muncul di sini.</div>';
+  var today = rsDayCur() === todayIso();
+  if (tab === 'isi') { var ci = rsCandRows(); body = ci.length ? '<div class="ap-list">' + ci.map(rsCandCard).join('') + '</div>'
+    : today ? '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang perlu diisi</b>Mobil yang sedang Anda kerjakan di Service Teknik otomatis muncul di sini.</div>'
+      : '<div class="empty">Tidak ada mobil Service Teknik pada tanggal ini.</div>'; }
+  else if (tab === 'acc') { var pa = rsPendRows(); body = pa.length ? '<div class="ap-list">' + pa.map(rsPendCard).join('') + '</div>'
+    : today ? '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang menunggu ACC</b>Reservasi yang diajukan mekanik muncul di sini.</div>'
+      : '<div class="empty">Tidak ada reservasi yang menunggu ACC pada tanggal ini.</div>'; }
   else {
     var rows = rsLapRows();
     body = rows.length ? '<div class="ap-list">' + rows.map(rsLapCard).join('') + '</div>' : '<div class="empty">' + esc(rsLapEmpty()) + '</div>';
@@ -3656,7 +3668,7 @@ function rsListHtml() {
 }
 function rsListUi() { var el = $('#rs_list'); if (el && S.view === 'rsv') el.innerHTML = rsListHtml(); }
 function vRsv() {
-  var R = S.rs, tab = rsTab(), nI = R.cand ? R.cand.length : 0, nA = R.pend.length, nL = R.cand ? rsLapRows().length : 0, only = rsOpsOnly();
+  var R = S.rs, tab = rsTab(), nI = R.cand ? rsCandRows().length : 0, nA = R.cand ? rsPendRows().length : 0, nL = R.cand ? rsLapRows().length : 0, only = rsOpsOnly();
   var tabs = only ? '' : '<div class="ls-mode ap-tabs rs-tabs">' +
     [['isi', 'Perlu diisi', nI], ['acc', 'Menunggu ACC', nA], ['lap', 'Laporan', nL]].map(function (t) { return '<button class="' + (tab === t[0] ? 'on' : '') + '" data-act="rstab" data-a="' + t[0] + '">' + t[1] + (R.cand ? ' (' + t[2] + ')' : '') + '</button>'; }).join('') + '</div>';
   var note = only ? (rsGdg() && rsAsgh() ? 'Reservasi dari mekanik langsung tampil di sini. <b>Gudang:</b> persiapkan barang segera, tidak perlu menunggu ACC. <b>ASGH:</b> setelah di-ACC, buatkan reservasinya.'
@@ -3665,8 +3677,8 @@ function vRsv() {
     : rsAcc() && !rsTeknik() ? 'Reservasi barang dari mekanik menunggu ACC Anda' + (S.me && S.me.jabatan ? ' sebagai <b>' + esc(S.me.jabatan) + '</b>' : '') + '. Salah satu Group Head / Section Head cukup.'
     : 'Mobil yang sedang dikerjakan Service Teknik otomatis masuk di sini lengkap dengan barang yang harus diganti. Pilih reservasi atau tidak; bila ya, Group Head / Section Head akan meng-ACC.';
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Reservasi</h2></div>' +
-    '<section class="pad">' + errBanner() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' + tabs +
-    (tab === 'lap' ? rsNav() + '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
+    '<section class="pad">' + errBanner() + rsNav() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' + tabs +
+    (tab === 'lap' ? '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
     '<div id="rs_list">' + rsListHtml() + '</div>' + foot() + '</section>';
 }
 /* ---- form (Nomor mobil, Mekanik, Jenis, Service, Keterangan, daftar barang, Tambahan barang, Ya / Tidak) ---- */
