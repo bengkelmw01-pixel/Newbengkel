@@ -207,7 +207,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-03 15:27';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-03 15:59';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -581,7 +581,7 @@ function vSet() {
 function usCardHtml(u) {
   return '<button class="us-card' + (u.aktif ? '' : ' off') + '" data-act="usedit" data-a="' + esc(u.nip) + '"><span class="us-av">' + esc(initial(u.nama)) + '</span><span class="us-tx"><b>' + esc(u.nama) + '</b>' +
     '<small>NIP ' + esc(u.nip) + (u.bagian ? ' &middot; ' + esc(u.bagian) : '') + (u.jabatan ? ' &middot; ' + esc(u.jabatan) : '') + '</small>' +
-    '<span class="us-ak' + (u.admin ? ' adm' : '') + '">' + esc(u.akses ? akLb(u.akses) : u.lb) + '</span>' + (u.aktif ? '' : '<span class="us-nf">Nonaktif</span>') + '</span>' + ic('chev', 'go') + '</button>';
+    '<span class="us-ak' + (u.admin ? ' adm' : '') + '">' + esc(u.akses ? akLb(u.akses) : u.lb) + '</span>' + (u.shift ? '<span class="us-sh">Shift ' + esc(u.shift) + '</span>' : '') + (u.aktif ? '' : '<span class="us-nf">Nonaktif</span>') + '</span>' + ic('chev', 'go') + '</button>';
 }
 function usInner() {
   var U = S.users, rows = U.rows, h = '<div class="us-head"><h4>User &amp; Akses' + (rows ? ' (' + rows.length + ')' : '') + '</h4><button class="btn" data-act="usadd">' + ic('plus') + ' Tambah User</button></div>';
@@ -704,6 +704,8 @@ function usForm(u) {
     '<label>Akses <em>klik satu atau lebih</em></label><input type="hidden" id="us_ak" value="' + esc(akVal(U.ak)) + '"><div class="ak-g" id="us_akg">' + akChips(U.ak) + '</div><div class="ak-sum" id="us_aks">' + akSum(U.ak) + '</div>' +
     '<div class="us-two"><div><label for="us_bg">Bagian <em>opsional</em></label><input id="us_bg" maxlength="40" autocomplete="off" placeholder="Teknik" value="' + esc(u ? u.bagian : '') + '"></div>' +
     '<div><label for="us_jb">Jabatan <em>opsional</em></label><input id="us_jb" maxlength="30" autocomplete="off" placeholder="M1" value="' + esc(u ? u.jabatan : '') + '"></div></div>' +
+    '<label for="us_sh">Shift kerja <em>opsional</em></label><select id="us_sh">' + [['', 'Belum diatur (dihitung Shift 1)'], ['1', 'Shift 1 &middot; 07:00 - 15:00'], ['3', 'Shift 3 &middot; 23:00 - 07:00']].map(function (o) { return '<option value="' + o[0] + '"' + ((u && u.shift || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+    '<div class="ak-sum">Boleh mulai kerja pukul <b>06:45</b> (Shift 1) atau <b>22:55</b> (Shift 3). Di Laporan Jam Mekanik, kerja Shift 3 setelah lewat tengah malam dihitung ke hari shift dimulai.</div>' +
     (u ? '<label class="us-chk"><input type="checkbox" id="us_on"' + (u.aktif ? ' checked' : '') + '> Aktif (bisa masuk &amp; mengerjakan)</label>' : '') +
     '<div class="us-err" id="us_err"></div>' +
     '<button class="btn full" id="us_save" data-act="ussave" style="margin-top:12px">' + ic('check') + ' Simpan</button>' +
@@ -731,6 +733,17 @@ function ymLabel(ym) { return BULAN[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
 function jamTxt(m) { return Math.floor(m / 60) + ' jam ' + (m % 60) + ' menit'; }
 function tmin(s) { var m = /^(\d{1,2}):(\d{2})/.exec(s || ''); return m ? (+m[1]) * 60 + (+m[2]) : null; }
 function ljYm() { var v = S.view; return v === 'jam' ? S.jam.d.slice(0, 7) : S.jam.rm; }
+/* Jam kerja minimal per mekanik per hari kerja: JAM_MIN menit ke atas = hijau, kurang = merah.
+   Hari kerja = tanggal shift dimulai: pekerjaan Shift 3 yang mulai sebelum pukul 15:00 (lewat tengah malam) dihitung ke tanggal sebelumnya. Belum diatur = Shift 1 (tanggal mulai kerja). */
+var JAM_MIN = 400, SH3_CUT = 15 * 60;
+function ljSd(r) { return r.sh === '3' && tmin(r.s) != null && tmin(r.s) < SH3_CUT ? isoAdd(r.d, -1) : r.d; }
+function ljNext(ym) { var n = ymAdd(ym, 1); return n <= todayIso().slice(0, 7) ? n : ''; }          /* bulan berikutnya (bila sudah ada): memuat sisa shift malam tanggal terakhir bulan ini */
+function ljPool(ym) {                                          /* semua baris yang hari kerjanya jatuh pada bulan ym */
+  var J = S.jam, out = [], R = J.rows[ym], N = ljNext(ym), RN = N ? J.rows[N] : null;
+  [R, RN].forEach(function (X) { if (X) X.rows.forEach(function (r) { if (ljSd(r).slice(0, 7) === ym) out.push(r); }); });
+  return out;
+}
+function ljDayRows(d) { return ljPool(d.slice(0, 7)).filter(function (r) { return ljSd(r) === d; }); }
 
 /* ambil data satu bulan; bila hash sama dengan yang sudah dipegang server menjawab {same:true} (kecil) */
 function jamFetch(ym, force) {
@@ -738,14 +751,18 @@ function jamFetch(ym, force) {
   var cur = J.rows[ym]; J.busy[ym] = true;
   return gs('getJam', [ym, cur ? cur.h : '', !!force]).then(function (r) {
     J.busy[ym] = false; J.err = ''; S.lastLoad = Date.now(); chk();
-    if (r && r.rows) { J.rows[ym] = r; if (S.view.indexOf('jam') === 0 && ljYm() === ym) rerender(); }
+    if (r && r.rows) {
+      J.rows[ym] = r; var nx = S.view.indexOf('jam') === 0 ? ljNext(ym) : '';
+      if (nx && !J.rows[nx]) jamFetch(nx);
+      if (S.view.indexOf('jam') === 0 && (ljYm() === ym || ljNext(ljYm()) === ym)) rerender();
+    }
     else if (!cur && S.view.indexOf('jam') === 0) rerender();
   }, function (er) {
     J.busy[ym] = false; J.err = msg(er);
     if (!cur && S.view.indexOf('jam') === 0 && ljYm() === ym) rerender();
   });
 }
-setInterval(function () { if (!document.hidden && S.view.indexOf('jam') === 0 && S.data) jamFetch(ljYm()); }, POLL_MS);
+setInterval(function () { if (!document.hidden && S.view.indexOf('jam') === 0 && S.data) { jamFetch(ljYm()); var nx = ljNext(ljYm()); if (nx === todayIso().slice(0, 7)) jamFetch(nx); } }, POLL_MS);
 
 /* ---------- Beranda: papan "Monitoring Service Bengkel" (realtime dari input mekanik dan pengawas) ---------- */
 var MON_POOL = 'POOL MARGASATWA';
@@ -967,13 +984,14 @@ function monTick() {
 setInterval(monTick, 1000);
 setInterval(function () { if (!document.hidden && S.view === 'mon' && S.auth !== 'login' && S.auth !== 'wait') monFetch(); }, MON_MS);
 
-/* satu baris per mekanik per hari: jam mulai = pengerjaan pertama, jam selesai = terakhir, total = jumlah lama semua pengerjaan yang sudah selesai */
+/* satu baris per mekanik per hari kerja: jam mulai = pengerjaan pertama, jam selesai = terakhir, total = jumlah lama semua pengerjaan yang sudah selesai */
 function ljGroup(rows) {
   var map = {}, order = [];
   rows.forEach(function (r) {
     var k = r.nip + '|' + r.nm, g = map[k];
-    if (!g) { g = map[k] = { nip: r.nip, nm: r.nm, bg: r.bg, jb: r.jb, jobs: [], run: 0, tot: 0, fin: 0, a: null, b: null, sa: '', sb: '' }; order.push(g); }
+    if (!g) { g = map[k] = { nip: r.nip, nm: r.nm, bg: r.bg, jb: r.jb, sh: r.sh || '', jobs: [], run: 0, tot: 0, fin: 0, a: null, b: null, sa: '', sb: '' }; order.push(g); }
     var a = tmin(r.s), done = r.e !== '' && r.m != null;
+    if (a != null && r.d !== ljSd(r)) a += 1440;          /* kerja Shift 3 setelah lewat tengah malam: hitung sebagai hari berikutnya agar urutan jam mulai / selesai benar */
     g.jobs.push(r);
     if (a != null && (g.a == null || a < g.a)) { g.a = a; g.sa = r.s; }
     if (done) { g.tot += r.m; g.fin++; if (a != null && (g.b == null || a + r.m > g.b)) { g.b = a + r.m; g.sb = r.e; } } else g.run++;
@@ -1015,7 +1033,7 @@ function ljState(R) {
 }
 function vJam() {
   var J = S.jam, d = J.d, R = J.rows[d.slice(0, 7)], g = [], p = isoParts(d), t0 = todayIso();
-  if (R) g = ljGroup(R.rows.filter(function (r) { return r.d === d; }));
+  if (R) g = ljGroup(ljDayRows(d));
   var head = '<div class="lj-head" role="button" tabindex="0" data-act="ljtop" aria-label="Laporan Jam Kerja Mekanik"><img src="' + LJ_IMG + '" alt=""><div class="lj-ht"><h3>Laporan Jam Kerja Mekanik</h3><p>Data Jam Kerja Mekanik</p>' +
     '<div class="lj-cnt">' + ic('people') + '<span id="ljcount">' + (R ? g.length : '-') + ' Orang</span></div></div>' + ic('chev', 'lj-go') + '</div>';
   var box = '<div class="lj-box" id="ljtable"><div class="lj-top"><div class="lj-dt">' +
@@ -1029,12 +1047,13 @@ function vJam() {
   else if (!g.length) box += '<div class="empty">Belum ada data jam kerja pada tanggal ini.</div>';
   else {
     var body = g.map(function (x, i) {
-      var sel = x.run ? '<span class="lj-run">Berjalan</span>' : (x.sb || '-');
+      var sel = x.run ? '<span class="lj-run">Berjalan</span>' : (x.sb || '-'), cl = x.tot >= JAM_MIN ? ' lj-ok' : ' lj-low';
       /* di HP kolom NIP, Jabatan, Jam Selesai, Total Menit digabung ke kolom di sebelahnya (class dk-c disembunyikan, fragmen class mo hanya tampil di HP) sehingga seluruh tabel muat tanpa digeser */
-      return '<tr><td>' + (i + 1) + '</td><td class="dk-c">' + esc(x.nip) + '</td><td class="l">' + esc(x.nm) + '<small class="mo">NIP ' + esc(x.nip) + '</small></td><td>' + esc(x.bg) + '<small class="mo">' + esc(x.jb) + '</small></td><td class="dk-c">' + esc(x.jb) + '</td><td>' + esc(x.sa || '-') + '<small class="mo">s/d ' + sel + '</small></td><td class="dk-c">' + sel + '</td>' +
-        '<td>' + (x.fin ? jamTxt(x.tot) : '-') + '<small class="mo">' + (x.fin ? x.tot + ' menit' : '') + '</small></td><td class="dk-c">' + (x.fin ? x.tot : '-') + '</td><td><a data-act="ljhist" data-a="' + i + '">Lihat<span class="mo"><br></span> history</a></td></tr>';
+      return '<tr><td>' + (i + 1) + '</td><td class="dk-c">' + esc(x.nip) + '</td><td class="l' + cl + '">' + esc(x.nm) + (x.sh ? '<small class="sh">Shift ' + x.sh + '</small>' : '') + '<small class="mo">NIP ' + esc(x.nip) + (x.sh ? ' &middot; Shift ' + x.sh : '') + '</small></td><td>' + esc(x.bg) + '<small class="mo">' + esc(x.jb) + '</small></td><td class="dk-c">' + esc(x.jb) + '</td><td>' + esc(x.sa || '-') + '<small class="mo">s/d ' + sel + '</small></td><td class="dk-c">' + sel + '</td>' +
+        '<td class="' + cl.trim() + '">' + (x.fin ? jamTxt(x.tot) : '-') + '<small class="mo">' + (x.fin ? x.tot + ' menit' : '') + '</small></td><td class="dk-c' + cl + '">' + (x.fin ? x.tot : '-') + '</td><td><a data-act="ljhist" data-a="' + i + '">Lihat<span class="mo"><br></span> history</a></td></tr>';
     }).join('');
-    box += ljTable([{ t: 'No' }, { t: 'NIP', c: 'dk-c' }, { t: '<span class="dk">Nama</span><span class="mo">Nama /<br>NIP</span>', l: 1 }, { t: '<span class="dk">Bagian</span><span class="mo">Bagian /<br>Jabatan</span>' }, { t: 'Jabatan', c: 'dk-c' }, { t: '<span class="dk">Jam<br>Mulai</span><span class="mo">Mulai /<br>Selesai</span>' }, { t: 'Jam<br>Selesai', c: 'dk-c' }, { t: '<span class="dk">Total Jam</span><span class="mo">Total</span>' }, { t: 'Total<br>Menit', c: 'dk-c' }, { t: '<span class="dk">History<br>Pengerjaan</span><span class="mo">History</span>' }], body, '', 800);
+    box += ljTable([{ t: 'No' }, { t: 'NIP', c: 'dk-c' }, { t: '<span class="dk">Nama</span><span class="mo">Nama /<br>NIP</span>', l: 1 }, { t: '<span class="dk">Bagian</span><span class="mo">Bagian /<br>Jabatan</span>' }, { t: 'Jabatan', c: 'dk-c' }, { t: '<span class="dk">Jam<br>Mulai</span><span class="mo">Mulai /<br>Selesai</span>' }, { t: 'Jam<br>Selesai', c: 'dk-c' }, { t: '<span class="dk">Total Jam</span><span class="mo">Total</span>' }, { t: 'Total<br>Menit', c: 'dk-c' }, { t: '<span class="dk">History<br>Pengerjaan</span><span class="mo">History</span>' }], body, '', 800) +
+      '<div class="lj-leg"><span><i class="g"></i>Hijau: total ' + JAM_MIN + ' menit atau lebih</span><span><i class="r"></i>Merah: kurang dari ' + JAM_MIN + ' menit (jam kerja hari itu belum cukup)</span></div>';
   }
   box += '</div>';
   var rekap = '<div class="lj-rekap"><div class="lj-rh">' + ic('report') + '<div><h3>Rekap Laporan Harian dan Bulanan</h3><p>Lihat rekap jam kerja mekanik dalam bentuk laporan harian dan bulanan</p></div></div>' +
@@ -1051,8 +1070,8 @@ function vJamHari() {
   var J = S.jam, R = J.rows[J.rm], days = {}, tot = { n: 0, m: 0, who: {} }, body = '', tfoot = '';
   if (J.rm === '') J.rm = todayIso().slice(0, 7);
   if (R) {
-    R.rows.forEach(function (r) {
-      var x = days[r.d] || (days[r.d] = { who: {}, n: 0, m: 0 });
+    ljPool(J.rm).forEach(function (r) {
+      var sd = ljSd(r), x = days[sd] || (days[sd] = { who: {}, n: 0, m: 0 });
       x.who[r.nip + '|' + r.nm] = 1; x.n++; if (r.e !== '' && r.m != null) x.m += r.m;
       tot.who[r.nip + '|' + r.nm] = 1; tot.n++; if (r.e !== '' && r.m != null) tot.m += r.m;
     });
@@ -1072,10 +1091,10 @@ function vJamBulan() {
   var J = S.jam, R = J.rows[J.rm], map = {}, order = [], body = '', tfoot = '', tot = { n: 0, m: 0 };
   if (J.rm === '') J.rm = todayIso().slice(0, 7);
   if (R) {
-    R.rows.forEach(function (r) {
+    ljPool(J.rm).forEach(function (r) {
       var k = r.nip + '|' + r.nm, x = map[k] || (map[k] = { nip: r.nip, nm: r.nm, bg: r.bg, jb: r.jb, days: {}, n: 0, m: 0 });
       if (!map[k].seen) { map[k].seen = 1; order.push(x); }
-      x.days[r.d] = 1; x.n++; if (r.e !== '' && r.m != null) { x.m += r.m; tot.m += r.m; } tot.n++;
+      x.days[ljSd(r)] = 1; x.n++; if (r.e !== '' && r.m != null) { x.m += r.m; tot.m += r.m; } tot.n++;
     });
     order.sort(function (a, b) { return a.nm.localeCompare(b.nm); });
     body = order.map(function (x, i) {
@@ -1090,22 +1109,23 @@ function vJamBulan() {
 }
 function ljHist(i) {
   var J = S.jam, R = J.rows[J.d.slice(0, 7)]; if (!R) return;
-  var g = ljGroup(R.rows.filter(function (r) { return r.d === J.d; }))[i]; if (!g) return;
-  var p = isoParts(J.d), jobs = g.jobs.slice().sort(function (a, b) { return (tmin(a.s) || 0) - (tmin(b.s) || 0); });
+  var g = ljGroup(ljDayRows(J.d))[i]; if (!g) return;
+  var p = isoParts(J.d), jobs = g.jobs.slice().sort(function (a, b) { return (a.d + ' ' + a.s).localeCompare(b.d + ' ' + b.s); });
   showModal('<div class="sh-head"><b>History Pengerjaan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="lj-hs">' + esc(g.nm) + '<small>NIP ' + esc(g.nip) + ' &middot; ' + esc(g.bg) + ' &middot; ' + esc(g.jb) + '<br>' + HARI[isoDow(J.d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</small></div>' +
+    '<div class="lj-hs">' + esc(g.nm) + '<small>NIP ' + esc(g.nip) + ' &middot; ' + esc(g.bg) + ' &middot; ' + esc(g.jb) + (g.sh ? ' &middot; Shift ' + g.sh : '') + '<br>' + HARI[isoDow(J.d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</small></div>' +
     '<div class="lj-hl">' + jobs.map(function (r) {
       var k = r.c.indexOf(' - '), n = k > 0 ? r.c.slice(0, k) : r.c, js = k > 0 ? r.c.slice(k + 3) : '', done = r.e !== '' && r.m != null, tdr = r.st === 'Tunda', src = null;
       if (r.lf) R.rows.forEach(function (x) { if (x.id === r.lf) src = x; });
       return '<div class="lj-hr"><span class="nchip">' + ic('car', 'sm') + esc(n || '-') + '</span><span class="pill ' + (/bantuan/i.test(js) ? 'pk-bm' : /supporting/i.test(js) ? 'pk-cs' : /keindahan/i.test(js) ? 'pk-ki' : (/corrective/i.test(js) ? 'pk-ck' : (/tabrak/i.test(js) ? 'pk-tb' : 'pk-teknik'))) + '">' + esc(js || 'Service') + '</span>' +
-        '<div class="tm">' + esc(r.s) + ' &ndash; ' + (done ? esc(r.e) : '<span class="lj-run" style="margin:0">Berjalan</span>') + '<span>' + (done ? '&middot; ' + jamTxt(r.m) : '') + '</span></div>' +
+        '<div class="tm">' + (r.d !== J.d ? '<small>' + dmyIso(r.d).slice(0, 5) + '</small> ' : '') + esc(r.s) + ' &ndash; ' + (done ? esc(r.e) : '<span class="lj-run" style="margin:0">Berjalan</span>') + '<span>' + (done ? '&middot; ' + jamTxt(r.m) : '') + '</span></div>' +
         (r.lf ? '<div class="lj-ap td">' + ic('clock', 'sm') + ' Meneruskan pekerjaan tunda' + (src ? ' dari ' + esc(src.nm) + ' (' + esc(src.s) + '&ndash;' + esc(src.e) + ')' : '') + '. Jam dimulai dari nol.</div>' : '') +
         (tdr ? '<div class="lj-ap td">' + ic('clock', 'sm') + ' Tunda' + (r.tc ? ': ' + esc(r.tc) : '') + '</div>' : '') +
         (r.pt ? '<div class="lj-pt"><small>Pekerjaan tambahan</small>' + esc(r.pt) + '</div>' : '') +
         (done && !tdr && r.ap === 'Disetujui' ? '<div class="lj-ap ok">' + ic('shield', 'sm') + ' Disetujui pengawas' + (r.pw ? ': ' + esc(r.pw) : '') + (r.wa ? ' &middot; ' + esc(r.wa) : '') + '</div>'
           : (done && !tdr && r.ap === 'Menunggu' ? '<div class="lj-ap wait">' + ic('shield', 'sm') + ' Menunggu approval pengawas</div>' : '')) + '</div>';
     }).join('') + '</div>' +
-    '<div class="lj-ht2"><span>' + g.jobs.length + ' pengerjaan</span><span>Total ' + (g.fin ? jamTxt(g.tot) : '-') + '</span></div>');
+    '<div class="lj-ht2"><span>' + g.jobs.length + ' pengerjaan</span><span class="' + (g.tot >= JAM_MIN ? 'lj-ok' : 'lj-low') + '">Total ' + (g.fin ? jamTxt(g.tot) : '-') + ' (' + g.tot + ' menit)</span></div>' +
+    '<div class="lj-leg" style="margin-top:6px">' + (g.tot >= JAM_MIN ? 'Sudah mencapai' : 'Belum mencapai') + ' jam kerja minimal ' + JAM_MIN + ' menit per hari.</div>');
 }
 
 /* ---------- list rendering ---------- */
@@ -4950,7 +4970,7 @@ var ACT = {
   ussave: function () {
     var U = S.users; if (U.saving) return;
     var g = function (id) { var e = $('#' + id); return e ? e.value.replace(/\s+/g, ' ').trim() : ''; };
-    var on = $('#us_on'), p = { nip: g('us_nip').replace(/\s+/g, ''), nama: g('us_nama'), akses: g('us_ak'), bagian: g('us_bg'), jabatan: g('us_jb'), aktif: on ? on.checked : true, old: U.old || '' };
+    var on = $('#us_on'), p = { nip: g('us_nip').replace(/\s+/g, ''), nama: g('us_nama'), akses: g('us_ak'), bagian: g('us_bg'), jabatan: g('us_jb'), shift: g('us_sh'), aktif: on ? on.checked : true, old: U.old || '' };
     var er = $('#us_err'), bad = function (m, id) { if (er) er.textContent = m; var f = $('#' + id); if (f) f.focus(); };
     if (!p.nama) return bad('Nama wajib diisi.', 'us_nama');
     if (!/^[A-Za-z0-9._-]{2,20}$/.test(p.nip)) return bad('NIP harus 2-20 karakter (huruf atau angka, tanpa spasi).', 'us_nip');

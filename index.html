@@ -499,6 +499,7 @@ body.on-nomo .toast{bottom:104px}
 .lj-tbl tr.lj-click{cursor:pointer}.lj-tbl tr.lj-click:hover td{background:#eef4ff}
 .lj-run{color:#0a3fd0;font-weight:800}
 .lj-tbl .mo,.lj-tbl .mo-c{display:none}
+.lj-tbl small.sh{display:block;font-size:11px;font-weight:600;color:#5b6b99;margin-top:1px}
 @media (max-width:640px){
   /* tabel jam kerja muat penuh di layar HP (tanpa digeser ke samping): kolom NIP / Jabatan / Jam Selesai / Total Menit digabung ke kolom sebelahnya */
   .lj-box{padding:10px 8px 8px}
@@ -506,7 +507,7 @@ body.on-nomo .toast{bottom:104px}
   .lj-tbl{min-width:0!important;table-layout:auto;font-size:12px}
   .lj-tbl th{font-size:11px;padding:9px 3px;line-height:1.2}
   .lj-tbl td{padding:9px 3px;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
-  .lj-tbl .dk,.lj-tbl .dk-c{display:none}
+  .lj-tbl .dk,.lj-tbl .dk-c,.lj-tbl small.sh{display:none}
   .lj-tbl td.mo-c,.lj-tbl th.mo-c{display:table-cell}
   .lj-tbl small.mo{display:block;font-size:10px;font-weight:500;color:#5b6b99;margin-top:2px}
   .lj-tbl span.mo{display:inline}
@@ -537,6 +538,7 @@ body.on-nomo .toast{bottom:104px}
 .lj-hs{font-weight:800;color:#0b1f9a;font-size:17px}.lj-hs small{display:block;font-weight:500;color:var(--muted);font-size:13px;margin-top:2px}
 .lj-hl{margin-top:12px;display:grid;gap:8px}
 .lj-hr{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;background:#f5f8ff;border-radius:14px;padding:10px 12px}
+.lj-hr .tm small{font-size:11.5px;font-weight:700;color:#8a5200;background:#fff1cf;border-radius:6px;padding:1px 6px;margin-right:2px}
 .lj-hr .tm{grid-column:1/-1;font-weight:700;color:#12308f;font-size:14px}.lj-hr .tm span{font-weight:500;color:var(--muted);margin-left:6px}
 .lj-hr .lj-pt{grid-column:1/-1;font-size:13.5px;line-height:1.4;color:var(--ink)}.lj-pt small{display:block;color:var(--muted);font-size:11.5px;font-weight:600}
 .lj-ap{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;flex-wrap:wrap}.lj-ap.ok{color:#0b8a5f}.lj-ap.wait{color:#c2410c}.lj-ap .ic{width:15px;height:15px}
@@ -714,6 +716,12 @@ body.on-login .content{margin-left:0}
 .us-note{background:#fff6e5;border:1.5px dashed #f0b44a;color:#92520a;border-radius:14px;padding:12px 14px;margin-bottom:10px;font-size:13.5px;line-height:1.45}
 .us-note b{color:#7a410a}
 .us-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.us-sh{display:inline-block;margin:5px 0 0 6px;font-size:12px;font-weight:700;border-radius:9px;padding:2px 9px;background:#fff1cf;color:#8a5200}
+.lj-ok{color:#0b8a3e!important;font-weight:800}
+.lj-low{color:#d32f2f!important;font-weight:800}
+.lj-leg{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:10px 2px 2px;font-size:12.5px;color:#4a5a86;line-height:1.35}
+.lj-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:baseline}
+.lj-leg i.g{background:#0b8a3e}.lj-leg i.r{background:#d32f2f}
 .ak-g{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 2px}
 .ak-ch{flex:none;display:inline-flex;align-items:center;gap:5px;border:1.5px solid #cdd7ef;background:#fff;color:var(--blue2);border-radius:12px;padding:10px 14px;min-height:44px;font-weight:700;font-size:14.5px;cursor:pointer}
 .ak-ch.on{background:#1a4fd8;border-color:#1a4fd8;color:#fff}
