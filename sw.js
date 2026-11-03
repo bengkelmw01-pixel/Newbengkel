@@ -1,10 +1,10 @@
-/* Service worker - Bengkel & Armada Monitoring (build d2d70eb04e).
+/* Service worker - Bengkel & Armada Monitoring (build 642122820c).
    - File aplikasi disimpan di perangkat: aplikasi tetap terbuka walau sinyal jelek / tanpa internet.
    - index.html, config.js, pwa.js: ambil dari jaringan dulu (selalu versi terbaru), cadangan dari simpanan.
    - app.js?v=...: berversi, jadi cukup diambil dari simpanan (hemat kuota).
    - Panggilan ke server Apps Script (alamat lain) TIDAK disentuh. */
-var CACHE = 'bka-d2d70eb04e';
-var SHELL = ['./', 'index.html', 'config.js', 'pwa.js', 'app.js?v=d2d70eb04e', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
+var CACHE = 'bka-642122820c';
+var SHELL = ['./', 'index.html', 'config.js', 'pwa.js', 'app.js?v=642122820c', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 var FRESH = /\/(index\.html|config\.js|pwa\.js)$/;
 
 self.addEventListener('install', function (e) {
@@ -29,7 +29,7 @@ function networkFirst(req, key) {
         if (m && !done) { done = true; resolve(m); } else if (then) then();
       });
     }
-    var t = setTimeout(function () { fromCache(); }, 4000);                       // jaringan lambat: pakai simpanan dulu
+    var t = setTimeout(function () { fromCache(); }, 1200);                       // jaringan lambat: pakai simpanan dulu (cukup 1,2 detik supaya aplikasi tidak menunggu lama)
     fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then(function (r) {      // no-cache = selalu tanya server (304 bila tidak berubah), jangan pakai simpanan HTTP 10 menit milik GitHub Pages
       clearTimeout(t);
       if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function (c) { c.put(key || req, cp); }); if (!done) { done = true; resolve(r); } }
