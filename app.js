@@ -207,7 +207,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-03 12:01';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-03 15:27';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -1535,6 +1535,7 @@ function pkSync() {
     var cs = pkCSig(x), cc = x.ck, kd = kdOf(x);
     var pay = { k: cc.k, d: cc.d, id: x.id, n: x.n, n0: cc.n0, tg: cc.jm, kl: cc.kl, s: x.s, e: x.e || 0, t: x.t || '', u: x.u || '', td: x.td ? 1 : 0, tc: x.tc || '', lf: x.lf || '' };
     if (x.bk) pay.bk = x.bk;          // waktu istirahat yang dipause (ms): dikurangkan dari Total Menit
+    if (x.adm) pay.ab = x.adm.nip;          // admin menyelesaikan atas nama mekanik lain: server memeriksa NIP admin dan mencatatnya
     if (kd === 'tb') { pay.rg = cc.rg || ''; pay.fo = cc.fo || []; pay.fs = cc.fs || []; pay.pem = x.e && !x.td && x.pem ? 1 : 0; }
     else if (kd === 'pem' || kd === 'las') { pay.rg = cc.rg || ''; pay.fo = cc.fo || []; pay.cs = cc.cs || []; }
     else { pay.nip = cc.nip; pay.nm = cc.nm; }
@@ -1555,6 +1556,7 @@ function pkSync() {
     if (x.j === 'ck' && x.ck && x.ck.kl) pay.kl = String(x.ck.kl).slice(0, 100);          // keluhan CK: server memakainya untuk aturan PKL tanpa ACC (ban / bocor / tambal)
     if (x.rv) pay.bt = 1;          // Cat salah klik dipindah ke Las: waktunya dibatalkan di Laporan Jam Mekanik
     if (x.bk) pay.bk = x.bk;          // waktu istirahat yang dipause (ms): dikurangkan dari Total Menit
+    if (x.adm) pay.ab = x.adm.nip;          // admin menyelesaikan atas nama mekanik lain
     gs('jamKerja', [pay]).then(function (r) {
       if (r && r.ok === false && r.conflict) { x.cf = r.conflict; x.err = ''; phPurge(x); tolak(); }
       else if (r && r.locked && r.ap) { apApply(x, r.ap, true); x.ok = 1; x.sg = pkSig(x); x.err = ''; x.okAt = Date.now(); }
@@ -1588,6 +1590,7 @@ function pkEl(j, t) { return Math.max(0, t - j.s - (j.bk || 0)) + (j.pre || 0); 
 function pkTimeHtml(j) {
   if (j.cf) return '<span class="pkend"><span class="pkl"><b>Tidak dicatat</b></span></span>';
   if (j.rv) return '<span class="pkend td"><span class="pkl"><b>Dibatalkan</b> (waktu tidak dihitung)</span></span>';
+  if (!j.e && j.adm && j.adE) return '<span class="pkend"><span class="pkl">Jam selesai <b>' + hm(pkNow(j)) + '</b></span><span class="pkl">Lama <b>' + pkDur(pkEl(j, pkNow(j))) + '</b></span></span>';          /* admin menyelesaikan pekerjaan mekanik lain: jam selesai yang dipilih admin */
   if (!j.e) return '<span class="pkrun"><i class="pkdot"></i>Berjalan <b>' + pkDur(pkEl(j, Date.now())) + '</b></span>';
   if (j.td) return '<span class="pkend td"><span class="pkl">Tunda <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(pkEl(j, j.e)) + '</b></span></span>';
   return '<span class="pkend"><span class="pkl">Selesai <b>' + hm(j.e) + '</b></span><span class="pkl">Lama <b>' + pkDur(pkEl(j, j.e)) + '</b></span></span>';
@@ -1798,7 +1801,7 @@ function brkOurs() { return !!($('#brk_ask') || $('#brk_rs')); }
 function brkModalOpen() { var m = $('#modal'); return !!m && m.classList.contains('show'); }
 function brkCd(ms) { var s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60); return (m ? m + ' menit ' : '') + (s % 60) + ' detik'; }
 function brkHm(w) { return pkP2(new Date(w.s).getHours()) + ':' + pkP2(new Date(w.s).getMinutes()) + ' - ' + pkP2(new Date(w.e).getHours()) + ':' + pkP2(new Date(w.e).getMinutes()); }
-function brkElig(j) { return !!j && !j.e && !j.cf && !j.rv && !j.ap && j.j !== 'cs' && j.j !== 'bm' && !j.gl; }          /* pekerjaan berjalan yang ikut aturan istirahat (CS tidak ikut) */
+function brkElig(j) { return !!j && !j.e && !j.cf && !j.rv && !j.ap && j.j !== 'cs' && j.j !== 'bm' && !j.gl && !j.adm; }          /* pekerjaan mekanik lain yang diselesaikan admin tidak ikut aturan istirahat HP admin */          /* pekerjaan berjalan yang ikut aturan istirahat (CS tidak ikut) */
 function brkPauseOne(j, at, w) {
   if (at <= j.s) at = j.s + 1000;
   j.e = at; j.td = 1; j.tc = BRK_TC; j.brk = 1; j.bwe = w.e; j.ap = null;
@@ -2532,7 +2535,8 @@ function ckTg(r) {
 }
 function ckRow(kd, r) {
   var tb = kdTb(kd), pem = kd === 'pem', las = kd === 'las', s = ckSt(kd, r), n = s.n || r.n || '', m = S.mi[n] || null, typed = String(r.n0 || '').trim(), j = s.job, k = esc(r.k), b = ' data-b="' + kd + '"';
-  var mob = nchip(n || '-') + (m && m.j ? '<span class="ck-jn">' + esc(m.j) + '</span>' : '');
+  var adm = ckAdmOk(kd, r, s);          /* admin boleh menyelesaikan pekerjaan mekanik lain yang sedang berjalan: No Mobil bisa diklik */
+  var mob = (adm ? '<button type="button" class="ck-admchip" data-act="ckadm" data-a="' + k + '"' + b + ' title="Selesaikan atas nama ' + esc(s.who) + '" aria-label="Selesaikan atas nama ' + esc(s.who) + '">' + nchip(n || '-') + '</button>' : nchip(n || '-')) + (m && m.j ? '<span class="ck-jn">' + esc(m.j) + '</span>' : '');
   if (!m) mob += '<span class="ck-warn">' + ic('warn', 'sm') + '<span>No Mobil tidak ada di Master.<span class="ck-wx"> Pilih yang benar saat menekan Kerjakan.</span></span></span>';
   if (typed && pkNum(typed) !== n) mob += '<span class="ck-o">' + KDC[kd].tulis + ': <b>' + esc(typed) + '</b></span>';
   var kl = '<div class="ck-kltx">' + esc(r.kl || (r.lc ? 'LC (laporan petugas cat)' : '-')) + '</div>', tdk = s.s === 'done' ? (j ? j.t : r.t) : '', fsl = pem ? (j && j.ck && j.ck.cs && j.ck.cs.length ? j.ck.cs : (r.fs || [])) : (tb ? (j && pkFsOf(j).length ? pkFsOf(j) : (r.fs || [])) : []);
@@ -2551,6 +2555,7 @@ function ckRow(kd, r) {
   if (s.s === 'las') act = '<span class="ck-bd las">' + ic('wrench', 'sm') + ' Di Las / Ketok &middot; ' + (r.las === 'Dikerjakan' ? 'sedang dikerjakan' + (r.lm ? ' oleh ' + esc(r.lm) : '') : (r.las === 'Tunda' ? 'ditunda' + (r.lm ? ' oleh ' + esc(r.lm) : '') : 'menunggu')) + '</span><div class="ck-lh">Cat bisa dikerjakan setelah Las selesai.</div>';
   else if (s.s === 'new' && vo) act = '<span class="ck-bd vo">' + ic('clock', 'sm') + ' Belum dikerjakan</span>';
   else if (s.s === 'new') act = '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Kerjakan</button>' + (pem ? '' : (las ? '<button class="ck-chg" data-act="lasback" data-a="' + k + '">Kembalikan ke Cat</button>' : '<button class="ck-chg" data-act="ckchg" data-a="' + k + '"' + b + '>Ganti No Mobil</button>'));
+  else if (s.s === 'run' && j.adm) act = '<button class="btn ck-go run" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('check', 'sm') + ' Selesaikan</button><span class="ck-by">Admin menyelesaikan atas nama ' + esc(j.un) + '. Jam kerja tetap untuk ' + esc(j.un) + '</span>';
   else if (s.s === 'run') act = '<button class="btn ck-go run" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('clock', 'sm') + ' Lanjutkan</button><span class="ck-by">Anda mengerjakan sejak ' + hm(j.s) + '</span>';
   else if (s.s === 'tunda') {
     var tcx = j ? j.tc : r.tc, jsx = j ? hm(j.s) : r.js, jex = j ? hm(j.e) : r.je;
@@ -2561,7 +2566,9 @@ function ckRow(kd, r) {
       (vo ? '' : '<button class="btn ck-go" data-act="ckgo" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan</button>');
   }
   else if (s.s === 'other') act = '<span class="ck-bd run">' + ic('wrench', 'sm') + ' Sedang dikerjakan oleh ' + (s.self ? 'Anda (perangkat lain)' : esc(s.who)) + (r.js ? ' sejak ' + esc(r.js) : '') + '</span>' +
-    (s.self && pkIdMs(r.pid) && !vo ? '<button class="btn ck-go" data-act="cktake" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan di perangkat ini</button>' + (S.pk.job && !S.pk.job.e && S.pk.job.n && !pkMulti() ? '<div class="ck-lh">Pengerjaan #' + esc(S.pk.job.n) + ' masih berjalan di perangkat ini. Tunda atau selesaikan dulu, lalu tekan Lanjutkan.</div>' : '') : '');
+    (s.self && pkIdMs(r.pid) && !vo ? '<button class="btn ck-go" data-act="cktake" data-a="' + k + '"' + b + '>' + ic('wrench', 'sm') + ' Lanjutkan di perangkat ini</button>' + (S.pk.job && !S.pk.job.e && S.pk.job.n && !pkMulti() ? '<div class="ck-lh">Pengerjaan #' + esc(S.pk.job.n) + ' masih berjalan di perangkat ini. Tunda atau selesaikan dulu, lalu tekan Lanjutkan.</div>' : '') : '') +
+    (adm ? '<button class="btn ghost ck-adm" data-act="ckadm" data-a="' + k + '"' + b + '>' + ic('shield', 'sm') + ' Selesaikan (Admin)</button><div class="ck-lh">Jam kerja tetap atas nama ' + esc(s.who) + '.</div>' : '');
+  else if (s.mine && j && j.adm) act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai atas nama ' + esc(j.un) + ' (oleh admin) &middot; ' + hm(j.s) + '&ndash;' + hm(j.e) + '</span>' + (S.pk.job === j ? '<button class="btn ghost ck-see" data-act="ckgo" data-a="' + k + '"' + b + '>Lihat</button>' : '');
   else if (s.mine) act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai oleh Anda &middot; ' + hm(j.s) + '&ndash;' + hm(j.e) + '</span>' + (S.pk.job === j ? '<button class="btn ghost ck-see" data-act="ckgo" data-a="' + k + '"' + b + '>Lihat</button>' : '');
   else act = '<span class="ck-bd ok">' + ic('check', 'sm') + ' Selesai oleh ' + esc(s.who) + (r.js && r.je ? ' &middot; ' + esc(r.js) + '&ndash;' + esc(r.je) : '') + '</span>';
   if (tb) return '<div class="ck-tr st-' + s.s + '"><div class="ck-no">' + r.no + '</div>' + ckTg(r) +
@@ -2785,17 +2792,78 @@ function ckTakeGo() {
   ckBegin(T.kd, r, s.n, '', null, { id: r.pid, s: ms });
   if (S.pk.job && S.pk.job.id === r.pid) toast('Pekerjaan #' + s.n + ' dilanjutkan di perangkat ini, jam kerja sejak ' + hm(ms));
 }
-function ckBegin(kd, r, n, lf, td, ov) {          /* ov = { id, s }: meneruskan pengerjaan yang sudah tercatat di sheet (id dan jam mulai asli dipertahankan) */
+/* ---------- Admin menyelesaikan pekerjaan mekanik lain (mis. HP mekanik bermasalah, foto selesai sudah ada) ----------
+   Admin menekan No Mobil pada kartu "Sedang dikerjakan oleh ...", memilih jam selesai, lalu menekan Pengerjaan Selesai di halaman pekerjaan.
+   Pekerjaan memakai id, jam mulai, dan NIP mekanik aslinya: jam kerja tetap masuk ke mekanik itu. Server mencatat admin yang menyelesaikan (kiriman membawa NIP admin: ab). */
+function ckAdmOk(kd, r, s) {
+  if (!isAdmin() || kd === 'las' || !s || s.s !== 'other' || s.self || !r.nk || !pkIdMs(r.pid)) return false;
+  return kd !== 'tb' || !!(r.fs && r.fs.length);          /* Cat: foto selesai wajib sudah ada */
+}
+function brkOverlap(a, b) {          /* waktu istirahat (ms) yang jatuh di antara jam a dan b */
+  var d0 = new Date(a), k, tot = 0;
+  for (k = 0; k <= Math.ceil((b - a) / 864e5) + 1; k++) BRK_W.forEach(function (w) {
+    var x = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + k, w[0], w[1]).getTime(), y = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + k, w[2], w[3]).getTime();
+    tot += Math.max(0, Math.min(b, y) - Math.max(a, x));
+  });
+  return tot;
+}
+function pkLocalIso(t) { var d = new Date(t); return d.getFullYear() + '-' + pkP2(d.getMonth() + 1) + '-' + pkP2(d.getDate()) + 'T' + pkP2(d.getHours()) + ':' + pkP2(d.getMinutes()); }
+function pkNow(j) {          /* waktu selesai: jam sekarang, atau jam selesai yang dipilih admin untuk pekerjaan mekanik lain */
+  var t = Date.now();
+  if (j && j.adm && j.adE) t = Math.min(t, Math.max(j.adE, j.s + 1000));
+  return t;
+}
+function ckAdmVal(A) {          /* jam selesai yang dipilih admin: { ok, e, bk, ov, err } */
+  var f = $('#cka_e'), e = f && f.value ? new Date(f.value).getTime() : NaN, now = Date.now();
+  if (!(e > 0)) return { ok: false, err: 'Isi jam selesai.' };
+  if (e <= A.s) return { ok: false, err: 'Jam selesai harus sesudah jam mulai (' + hm(A.s) + ').' };
+  if (e > now) return { ok: false, err: 'Jam selesai tidak boleh lebih dari jam sekarang.' };
+  var ov = brkOverlap(A.s, e), cb = $('#cka_b'), bk = ov && cb && cb.checked ? ov : 0;
+  return { ok: true, e: e, ov: ov, bk: bk };
+}
+function ckAdmCalc() {
+  var A = S.ckAdm; if (!A) return;
+  var c = ckAdmVal(A), sm = $('#cka_sum'), bw = $('#cka_bw'), bt = $('#cka_bt'), go = $('#cka_go');
+  if (bw) bw.style.display = c.ov ? '' : 'none';
+  if (bt && c.ov) bt.textContent = 'Kurangi waktu istirahat ' + Math.round(c.ov / 60000) + ' menit dari jam kerja';
+  if (sm) { sm.className = 'cka-sum' + (c.ok ? '' : ' bad'); sm.textContent = c.ok ? 'Jam kerja ' + A.nm + ': ' + pkDur(Math.max(0, c.e - A.s - c.bk)) + ' (' + hm(A.s) + ' - ' + hm(c.e) + ')' : c.err; }
+  if (go) go.disabled = !c.ok;
+}
+function ckAdmAsk(kd, r) {
+  var s = ckSt(kd, r), ms = pkIdMs(r.pid), now = Date.now();
+  S.ckAdm = { kd: kd, k: r.k, s: ms, nm: s.who };
+  showModal('<div class="sh-head"><b>Selesaikan atas nama ' + esc(s.who) + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(s.n || r.n || '') + '</b> <span class="pill pk-' + kd + '">' + esc(KDC[kd].t) + '</span>' +
+    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(s.who) + '<br><small class="mut">Jam kerja tercatat untuk ' + esc(s.who) + ', bukan untuk Anda.</small></dd><dt>Mulai</dt><dd>' + hm(ms) + ' &middot; ' + pkDmy(ms) + '</dd>' + (kd === 'tb' ? '<dt>Foto selesai</dt><dd>' + r.fs.length + ' foto, sudah ada</dd>' : '') + '</dl></div>' +
+    '<div class="pkkt"><label for="cka_e">Jam selesai <em>jam pekerjaan benar-benar selesai</em></label><input type="datetime-local" id="cka_e" value="' + pkLocalIso(now) + '" min="' + pkLocalIso(ms) + '" max="' + pkLocalIso(now) + '"></div>' +
+    '<label class="cka-ck" id="cka_bw" style="display:none"><input type="checkbox" id="cka_b" checked><span id="cka_bt"></span></label>' +
+    '<div class="cka-sum" id="cka_sum"></div>' +
+    '<div class="pkq">Lanjut menyelesaikan pekerjaan ini?<small>Berikutnya Anda diarahkan ke halaman pekerjaan untuk menekan Pengerjaan Selesai. Sheet mencatat bahwa admin ' + esc(meNama()) + ' yang menyelesaikan.</small></div>' +
+    '<div class="pkyn"><button class="btn ghost" data-act="closemodal">Batal</button><button class="btn pkdone" id="cka_go" data-act="ckadmyes">' + ic('check') + ' Ya, lanjutkan</button></div>');
+  ckAdmCalc();
+}
+function ckAdmGo() {
+  var A = S.ckAdm; if (!A) return;
+  var r = ckRowOf(A.kd, A.k), s = r && ckSt(A.kd, r);
+  if (!r || !ckAdmOk(A.kd, r, s) || pkIdMs(r.pid) !== A.s) { S.ckAdm = null; closeModal(); toast('Status pekerjaan sudah berubah, memuat ulang.', true); ckFetch(A.kd, S[A.kd].d, true); return; }
+  var c = ckAdmVal(A); if (!c.ok) { toast(c.err, true); return; }
+  if (pkBlock(S.pk.job, A.kd)) return;
+  S.ckAdm = null; closeModal();
+  ckBegin(A.kd, r, s.n, '', null, { id: r.pid, s: A.s, u: r.nk, un: s.who, adm: { nip: meNip(), nm: meNama() }, adE: c.e, bk: c.bk });
+  if (S.pk.job && S.pk.job.id === r.pid) toast('Tekan Pengerjaan Selesai. Jam kerja tercatat untuk ' + s.who + '.');
+}
+function ckBegin(kd, r, n, lf, td, ov) {          /* ov = { id, s }: meneruskan pengerjaan yang sudah tercatat di sheet (id dan jam mulai asli dipertahankan); ov.u / un / adm / adE / bk: admin menyelesaikan atas nama mekanik lain */
   var cur = S.pk.job;
   if (pkBlock(cur, kd)) return;
   pkLeave(cur);
   var t0 = ov ? ov.s : Date.now();
   S.pk.job = { id: ov ? ov.id : 'J' + t0 + Math.random().toString(36).slice(2, 5), n: n, j: kd, s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, cy: '',
-    td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: meNip(), un: meNama(), cf: '',
+    td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: ov && ov.u ? ov.u : meNip(), un: ov && ov.un ? ov.un : meNama(), cf: '',
     ck: kd === 'pem' ? { k: r.k, d: r.d, jm: r.jm || '', rg: r.rg || '', n0: r.n0 || '', fo: (r.fo || []).slice(0, 4), cs: (r.fs || []).slice(0, 6), kl: r.kl || '' }
       : kd === 'las' ? { k: r.k, d: r.d, jm: r.jm || '', rg: r.rg || '', n0: r.n0 || '', fo: (r.fo || []).slice(0, 4), kl: r.kl || '' }
       : kd === 'tb' ? { k: r.k, d: r.d, jm: r.jm || '', rg: r.rg || '', n0: r.n0 || '', fo: (r.fo || []).slice(0, 4), fs: (r.fs || []).slice(0, 6), kl: r.kl || '', lc: r.lc ? 1 : 0 }
       : { k: r.k, d: r.d, jm: r.jm || '', n0: r.n0 || '', nip: r.nip || '', nm: r.nm || '', kl: r.kl || '' } };
+  if (ov && ov.adm) { S.pk.job.adm = ov.adm; S.pk.job.adE = ov.adE || 0; S.pk.job.bk = ov.bk || 0; }
   pkJobSave(); go('jobpk'); pkSync();
 }
 /* sesudah laporan CK/TB terkirim: perbarui daftar di layar tanpa menunggu pembacaan ulang, lalu baca ulang dari sheet */
@@ -2848,7 +2916,7 @@ function pkFsBlock(job) {
   var fs = pkFsOf(job), done = !!job.e, F = fsf(job), room = Math.max(0, FS_MAX - fs.length), n = lcFilled(F.fo), e = S.pk.fsErr;
   var h = '<div class="pkfs ' + (fs.length ? 'ok' : 'no') + '" id="pk_fs"><div class="pkfs-h"><span>Foto Selesai</span>' + (fs.length ? '<em class="ok">' + fs.length + ' foto</em>' : '<em>wajib ada</em>') + '</div>';
   if (fs.length) h += '<div class="pkfs-box">' + tbFotoHtml(c.k, fs, true, 'tbfs', 'selesai') + (done ? '' : '<small>' + ic('check', 'sm') + ' Foto selesai sudah masuk ke aplikasi klaim. Tekan Pengerjaan Selesai.</small>') + '</div>';
-  if (!done && room > 0) {
+  if (!done && room > 0 && !job.adm) {          /* admin yang menyelesaikan pekerjaan mekanik lain tidak menambah foto (foto selesai sudah ada) */
     h += '<div class="pkfs-cap"><div class="pkfs-ct">' + (fs.length ? 'Tambah foto' : 'Foto sesudah pengerjaan') + '<small>Minimal 1, maksimal ' + FS_MAX + ' foto. Dari kamera atau file JPG / PNG. Hasilnya dikirim ke aplikasi klaim.</small></div>' +
       lcPhHtml(F.fo, 's', F.busy, room) +
       '<button type="button" class="btn full pkfs-send" id="fs_send" data-act="fssend"' + (n && !F.busy ? '' : ' disabled') + '>' + (F.busy ? ic('clock', 'sm') + ' ' + esc(F.prog || 'Mengirim...') : ic('check', 'sm') + ' Kirim foto ke aplikasi klaim' + (n ? ' (' + n + ')' : '')) + '</button>' +
@@ -2921,7 +2989,7 @@ function pkPemNote() {
 /* tombol Pengerjaan Selesai pada Cat: tanya dulu "Armada ini membutuhkan PEM?" */
 function pkAskPem(j) {
   showModal('<div class="sh-head"><b>Pengerjaan Cat Selesai</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Lama</dt><dd>' + pkDur(pkEl(j, Date.now())) + '</dd></dl></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-tb">Tabrak &middot; Cat</span><dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Lama</dt><dd>' + pkDur(pkEl(j, pkNow(j))) + '</dd></dl></div>' +
     '<div class="pkq">Armada ini membutuhkan PEM?<small>Jika Ya, waktu Cat berhenti dan armada ini masuk ke daftar PEM (Job Mekanik &gt; Tabrak &gt; PEM). Jika Tidak, pengerjaan selesai seperti biasa.</small></div>' +
     '<div class="pkyn"><button class="btn ghost" data-act="pkpem" data-a="0">Tidak</button><button class="btn pkdone" data-act="pkpem" data-a="1">' + ic('check') + ' Ya, perlu PEM</button></div>');
 }
@@ -2937,6 +3005,7 @@ function pkLasHtml(job, done) {          /* Las / Ketok: Foto Selesai Ketok (min
 function pkShowCk(el, job) {
   var kd = kdOf(job), tb = kdTb(kd), pem = kd === 'pem', c = job.ck, n = job.n, m = S.mi[n] || {}, done = !!job.e, dd = isoParts(c.d), typed = String(c.n0 || '').trim();
   var rows = '<dt>Mekanik</dt><dd>' + esc(job.un || meNama()) + '</dd>' +
+    (job.adm ? '<dt>Diselesaikan oleh</dt><dd>Admin ' + esc(job.adm.nm) + '<br><small class="mut">Jam kerja tetap untuk ' + esc(job.un) + (job.adE ? ' &middot; jam selesai ' + hm(job.adE) : '') + '</small></dd>' : '') +
     (tb ? '<dt>No Registrasi</dt><dd>' + esc(c.rg || '-') + '</dd>'
       : '<dt>Dilaporkan oleh</dt><dd>' + esc(c.nm || '-') + (c.nip ? '<br><small class="mut">NIP ' + esc(c.nip) + '</small>' : '') + '</dd>') +
     '<dt>Tanggal ' + (tb ? 'Masuk' : 'Laporan') + '</dt><dd>' + HARI[isoDow(c.d)] + ', ' + dd.d + ' ' + BULAN[dd.m - 1] + ' ' + dd.y + (c.jm ? ' &middot; ' + esc(c.jm) : '') + '</dd>' +
@@ -2968,12 +3037,13 @@ function pkShowCk(el, job) {
       : '<div class="pkx"><label for="pk_t">Tindakan / pekerjaan yang dilakukan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="300" placeholder="Tulis perbaikan yang dilakukan, contoh: Ganti filter AC">' + esc(job.t || '') + '</textarea></div>';
     acts = done ? '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div>' + (kd === 'las' ? '<div id="pk_app">' + pkAppHtml(job) + '</div>' : pkAppHtml(job)) + (kd === 'tb' && job.pem ? pkPemNote() : '') +
         '<button class="btn full pkbtn" data-act="pknew">' + ic('wrench') + ' Kembali ke Daftar ' + kdLbl(kd) + '</button>' +
-        (job.ap ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>')
+        (job.ap || job.adm ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>')
       : '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + (kd === 'tb' && !pkFsOf(job).length || pem && !pemkSel(job).length || kd === 'las' && !phGo(job) ? ' disabled' : '') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
         (kd === 'las' ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>' : '') +
         (pem ? '<div class="pkfs-hint" id="pk_pkh"' + (pemkSel(job).length ? ' style="display:none"' : '') + '>Pilih minimal satu pekerjaan PEM dulu, baru tombol ini aktif.</div>' : '') +
         (kd === 'tb' ? '<div class="pkfs-hint" id="pk_fsh"' + (pkFsOf(job).length ? ' style="display:none"' : '') + '>Tombol ini aktif setelah foto selesai terkirim (minimal 1 foto).</div>' : '') +
-        '<button class="btn ghost full pkbtn pktunda" data-act="pktunda">' + ic('clock') + ' Tunda</button><div class="pktd-h">Belum selesai? Tekan Tunda: waktu berhenti dan pekerjaan bisa dilanjutkan mekanik lain.</div>' + (kd === 'tb' ? pkRevHtml(job) : '');
+        (job.adm ? '<button class="btn ghost full pkbtn" data-act="pkadd">' + ic('back', 'sm') + ' Kembali ke Daftar ' + kdLbl(kd) + '</button><div class="pktd-h">Pekerjaan ini milik ' + esc(job.un) + '. Admin hanya menyelesaikan; tidak bisa menunda dari sini.</div>'
+          : '<button class="btn ghost full pkbtn pktunda" data-act="pktunda">' + ic('clock') + ' Tunda</button><div class="pktd-h">Belum selesai? Tekan Tunda: waktu berhenti dan pekerjaan bisa dilanjutkan mekanik lain.</div>' + (kd === 'tb' ? pkRevHtml(job) : ''));
   }
   el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(n) + '</b><span class="pill pk-' + kd + '">' + KDC[kd].t + '</span></div>' +
     '<dl class="kv">' + rows + '</dl>' + pkLfHtml(job) + mid + acts + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
@@ -4456,7 +4526,7 @@ var ACT = {
         if (tl) { tl.classList.add('bad'); tl.focus(); try { tl.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
         return;
       }
-      j.t = kl; j.e = Date.now(); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan Las selesai, waktu berhenti'); return;
+      j.t = kl; j.e = pkNow(j); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan Las selesai, waktu berhenti'); return;
     }
     if (j.ck && kdOf(j) === 'pem') {
       var ps = pemkSel(j);
@@ -4465,7 +4535,7 @@ var ACT = {
         var pe1 = $('#pk_pk'); if (pe1) { try { pe1.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
         return;
       }
-      j.t = ps.join(', '); j.e = Date.now(); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan PEM selesai, waktu berhenti'); return;
+      j.t = ps.join(', '); j.e = pkNow(j); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan PEM selesai, waktu berhenti'); return;
     }
     if (csModulJ(j) && phFilled(j) < phMin(j)) {          // Perawatan mojul: minimal 1 foto selesai (maksimal 5)
       var tm = $('#pk_t'); if (tm) j.t = tm.value; pkJobSave();
@@ -4491,7 +4561,7 @@ var ACT = {
       if (ta) { ta.classList.add('bad'); ta.focus(); try { ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
       return;
     }
-    j.e = Date.now(); j.ap = null; pkFinGroup(j); bnCancelFor(j); pkJobSave(); pkShow(); pkSync(); toast(j.gm && j.gm.length ? 'Pengerjaan selesai untuk ' + (1 + j.gm.length) + ' mobil, waktu berhenti' : 'Pengerjaan selesai, waktu berhenti');
+    j.e = pkNow(j); j.ap = null; pkFinGroup(j); bnCancelFor(j); pkJobSave(); pkShow(); pkSync(); toast(j.gm && j.gm.length ? 'Pengerjaan selesai untuk ' + (1 + j.gm.length) + ' mobil, waktu berhenti' : 'Pengerjaan selesai, waktu berhenti');
   },
   pkfscek: function () { pkFsCheck('manual'); },
   pemk: function (a) {
@@ -4504,7 +4574,7 @@ var ACT = {
   pkpem: function (a) {
     var j = S.pk.job; if (!j || j.e || j.cf || !j.ck || kdOf(j) !== 'tb') return;
     var fs = pkFsOf(j); if (!fs.length) { closeModal(); toast('Kirim foto selesai dulu (minimal 1 foto).', true); pkFsCheck('tick'); return; }
-    j.pem = a === '1' ? 1 : 0; j.t = 'Foto selesai (' + fs.length + ' foto)'; j.e = Date.now(); j.ap = null;
+    j.pem = a === '1' ? 1 : 0; j.t = 'Foto selesai (' + fs.length + ' foto)'; j.e = pkNow(j); j.ap = null;
     pkJobSave(); closeModal(); pkShow(); pkSync(); toast(j.pem ? 'Cat selesai. Armada masuk ke daftar PEM.' : 'Pengerjaan selesai, waktu berhenti');
   },
   aptab: function (a) { S.ap.tab = a === 'done' ? 'done' : (a === 'izin' ? 'izin' : 'wait'); rerender(); },
@@ -4680,8 +4750,18 @@ var ACT = {
   ckopen: function () { if (S.pk.job) go('jobpk'); },
   pkswitch: function (a) { pkSwitch(a); },
   pkadd: function () { var j = S.pk.job; if (j) go(j.ck ? kdOf(j) : (j.j === 'cs' ? 'jobcs' : 'jobmek')); },
+  ckadm: function (a, b) {
+    var kd = kdArg(b), r = ckRowOf(kd, a); if (!r) return;
+    var s = ckSt(kd, r);
+    if (!ckAdmOk(kd, r, s)) { toast('Status pekerjaan sudah berubah, memuat ulang.', true); ckFetch(kd, S[kd].d, true); return; }
+    if (pkBlock(S.pk.job, kd)) return;
+    ckAdmAsk(kd, r);
+  },
+  ckadmyes: function () { ckAdmGo(); },
   ckgo: function (a, b) {
     var kd = kdArg(b), r = ckRowOf(kd, a); if (!r) return;
+    var sa = ckSt(kd, r);
+    if (sa.mine && sa.job && sa.job.adm) { if (S.pk.job === sa.job) go('jobpk'); else if (!sa.job.gl && S.pk.bg.indexOf(sa.job) >= 0) pkSwitch(sa.job.id); return; }          // admin sedang menyelesaikan pekerjaan mekanik lain: buka halamannya (tanpa syarat akses jenis pekerjaan)
     if (!canKd(kd)) { toast('Akun Anda tidak punya akses ke ' + KDC[kd].t + '.', true); return; }
     var s = ckSt(kd, r);
     if (s.s === 'tunda' && s.mine && s.job && s.job.brk && S.pk.job === s.job) { go('jobpk'); return; }
@@ -4923,6 +5003,7 @@ document.addEventListener('input', function (e) {
   else if (/^(ck|tb|pem|las)_q$/.test(e.target.id || '')) { var kq = e.target.id.split('_')[0]; S[kq].q = e.target.value; if (kq === 'tb' && S.tb.reg) { S.tb.reg = ''; tbRegUi(); } ckRefresh(kq); }
   else if (/^(ck|tb|pem|las)_pq$/.test(e.target.id || '')) { var kp = e.target.id.split('_')[0]; if (S[kp].pick) { S[kp].pick.q = e.target.value; ckPickRefresh(kp); } }
   else if (/^fk_/.test(e.target.id || '')) { fkInput(e.target.id.slice(3), e.target.value, e.target); }
+  else if (e.target.id === 'cka_e') ckAdmCalc();
   else if (e.target.id === 'pk_t') { var jt = S.pk.job; if (jt && !jt.e) { jt.t = e.target.value; e.target.classList.remove('bad'); pkJobSave(); if (jt.ck && kdOf(jt) === 'las') phDoneUi(jt); if (jt.j === 'cs') csDoneUi(jt); } }
   else if (e.target.id === 'cs_n') { S.cs.n = e.target.value; csResUi(); }
   else if (e.target.classList && e.target.classList.contains('cs-mi')) { var cmi = +e.target.getAttribute('data-i'); if (!S.cs.m) S.cs.m = []; S.cs.m[cmi] = e.target.value; csResUi(); }
@@ -4937,6 +5018,7 @@ document.addEventListener('change', function (e) {
     return;
   }
   if (e.target.id === 'tb_reg') { tbRegPick(e.target.value); return; }
+  if (e.target.id === 'cka_e' || e.target.id === 'cka_b') { ckAdmCalc(); return; }
   if (e.target.id === 'cs_p') { S.cs.p = e.target.value; S.cs.n = ''; S.cs.m = []; csRestUi(); return; }
   if (e.target.id === 'ap_kt' || e.target.id === 'ap_kq') { var ae = $('#ap_err'); if (ae) ae.textContent = ''; e.target.classList.remove('bad'); return; }
   if (/^(ck|tb|pem|las)_d$/.test(e.target.id || '')) {
