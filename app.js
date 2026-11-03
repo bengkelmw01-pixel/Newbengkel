@@ -207,7 +207,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-03 15:59';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-04 06:45';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -1418,12 +1418,13 @@ function pkJobSave() {
    Pekerjaan yang sedang dibuka = S.pk.job. Yang lain tetap berjalan di S.pk.bg: jamnya terus dihitung dari jam mulainya dan dikirim ke sheet seperti biasa; dibuka lagi lewat daftar "Pekerjaan lain".
    Corrective Supporting Cat spion / Cat cover dop: semua petugas boleh memasukkan beberapa No Mobil sekaligus. Mobil pertama = pekerjaan utama (S.pk.job), mobil lain = pengikut (gl = id pekerjaan utama) di S.pk.bg.
    Pengikut ikut selesai bersama pekerjaan utama (jam mulai / selesai dan Keterangan sama); tiap mobil tetap satu baris di Laporan Jam Mekanik. */
+var PK_MULTI_ON = false;          /* false = SEMUA petugas (termasuk Cat) hanya boleh satu pekerjaan berjalan: pekerjaan awal harus Tunda / Selesai dulu. true = petugas Cat / Devi boleh banyak pekerjaan sekaligus (aturan 2 November). */
 var PK_MULTI_NIP = ['14118'];          /* Deviana (Bagian Bekleding) diperlakukan sama dengan petugas Cat */
 var PK_MULTI_KD = ['tb', 'ck', 'pem', 'las', 'cs'];          /* jenis pekerjaan yang boleh dimulai saat pekerjaan lain masih berjalan */
 var CS_MULTI = ['Cat spion', 'Cat cover dop'];          /* CS yang boleh diisi beberapa No Mobil sekaligus */
 var CS_MAXM = 10;          /* maksimal mobil dalam satu isian (termasuk mobil pertama) */
 function pkMulti() {
-  var m = S.me; if (!m) return false;
+  var m = S.me; if (!m || !PK_MULTI_ON) return false;
   return /(^|[^a-z])cat([^a-z]|$)/i.test(String(m.bagian || '')) || PK_MULTI_NIP.indexOf(String(m.nip || '').trim()) >= 0;
 }
 function pkAll() { return (S.pk.job ? [S.pk.job] : []).concat(S.pk.q || [], S.pk.bg || []); }          /* urutan penting: pekerjaan utama selalu sebelum pengikutnya */
@@ -2027,9 +2028,9 @@ function pkShowCs(el, job) {
     '<dt>Waktu Mulai</dt><dd>' + hm(job.s) + ' &middot; ' + pkDmy(job.s) + '<div class="pktime" id="pktime">' + pkTimeHtml(job) + '</div></dd>';
   var ph = mod ? '<div class="pkph" id="pk_ph">' + pkPhHtml(job) + '</div>' : '', body;
   if (job.cf) body = pkCfHtml(job);
-  else if (done) body = '<div class="pkx ro"><span>Keterangan</span><p>' + esc(job.t || '-') + '</p></div>' + ph + '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
+  else if (done) body = '<div class="pkx ro"><span>Keterangan</span><p>' + esc(job.t || '-') + '</p></div>' + rsvBlock(job) + ph + '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
     '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' + (job.ap ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>');
-  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="Isi manual, contoh: Mojul diganti dan sudah dites normal">' + esc(job.t || '') + '</textarea></div>' + ph +
+  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="Isi manual, contoh: Mojul diganti dan sudah dites normal">' + esc(job.t || '') + '</textarea></div>' + rsvBlock(job) + ph +
     '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + ((mod ? phGo(job) : csKet(job)) ? '' : ' disabled') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
     (mod ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>'
       : '<div class="pkfs-hint" id="pk_csh"' + (csKet(job) ? ' style="display:none"' : '') + '>Isi Keterangan dulu (wajib). Tombol Pengerjaan Selesai aktif setelah Keterangan terisi.</div>');
@@ -2210,7 +2211,7 @@ function pkShowMain() {
     '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' +
     '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>';
   else body = (done ? '<div class="pkx ro"><span>Pekerjaan Tambahan</span><p>' + esc(job.t || '-') + '</p></div>'
-      : '<div class="pkx"><label for="pk_t">Pekerjaan Tambahan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="300" placeholder="Isi manual. Jika tidak ada, tulis: Tidak ada">' + esc(job.t || '') + '</textarea></div>') +
+      : '<div class="pkx"><label for="pk_t">Pekerjaan Tambahan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="300" placeholder="Isi manual. Jika tidak ada, tulis: Tidak ada">' + esc(job.t || '') + '</textarea></div>') + rsvBlock(job) +
     (fkOn(job) ? '<button class="btn ghost full pkbtn pknomo" data-act="nomo">' + ic('clip') + ' Form Fokus ' + (job.fs ? '<span class="pkbadge ok">' + ic('check', 'sm') + ' Tersimpan</span>' : '<span class="pkbadge">' + (job.fcl ? 'Memuat...' : 'Wajib diisi') + '</span>') + '</button>' + fkCarryHtml(job) : '<div class="pkph" id="pk_ph">' + pkPhHtml(job) + '</div>') +
     (done ? '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
         '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' +
@@ -3066,7 +3067,7 @@ function pkShowCk(el, job) {
           : '<button class="btn ghost full pkbtn pktunda" data-act="pktunda">' + ic('clock') + ' Tunda</button><div class="pktd-h">Belum selesai? Tekan Tunda: waktu berhenti dan pekerjaan bisa dilanjutkan mekanik lain.</div>' + (kd === 'tb' ? pkRevHtml(job) : ''));
   }
   el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">#' + esc(n) + '</b><span class="pill pk-' + kd + '">' + KDC[kd].t + '</span></div>' +
-    '<dl class="kv">' + rows + '</dl>' + pkLfHtml(job) + mid + acts + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
+    '<dl class="kv">' + rows + '</dl>' + pkLfHtml(job) + mid + rsvBlock(job) + acts + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
   if (kd === 'tb' && !done && !job.cf && !pkFsOf(job).length) pkFsCheck('show');
 }
 
@@ -3984,6 +3985,25 @@ function rsItemsFor(kd, sv) {          /* barang otomatis untuk nomor S yang dik
 function rsFormItems(f) { return f.ns ? rsItemsFor(f.kd, f.sv) : f.it; }
 function rsItemTxt(x) { return typeof x === 'string' ? x : x.t + (x.q ? ' ' + x.q : ''); }
 function rsMine(p) { return !!p.bn && String(p.bn).toLowerCase() === String(meNip()).toLowerCase(); }
+/* ---- Reservasi MANUAL / SUSULAN (selain paket otomatis Service Teknik): barang diketik sendiri ----
+   Manual  = tombol Reservasi di halaman pekerjaan CK / Keindahan / Cat / CS / Las / PEM -> Draft muncul di "Perlu diisi" pembuatnya.
+   Susulan = reservasi sudah di-ACC tetapi masih kurang: tombol "Butuh reservasi lagi" -> reservasi baru, nomor mobil sama. */
+function rsMy(d) { return isAdmin() || rsMine(d) || (!!d.mk && !!(S.me && S.me.nama) && String(d.mk).toLowerCase() === String(S.me.nama).toLowerCase()); }   /* reservasi milik mekanik ini */
+function rsMek() { return !!(S.me && S.me.jobs && Object.keys(S.me.jobs).length); }          /* akun yang mengerjakan pekerjaan (mekanik / Admin) */
+function rsLbl(d) { return d.rj ? (d.rj === 'Susulan' ? 'Susulan' : 'Manual') + ' \u00b7 ' + (d.pk || '') + (d.rj === 'Susulan' && d.sv ? ' ' + d.sv : '') : 'Service ' + d.sv; }
+function rsPill(d) { return d.rj ? '<span class="pill pk-rsm">' + esc(rsLbl(d)) + '</span>' : '<span class="pill pk-teknik">Service ' + esc(d.sv) + '</span>'; }
+function rsFormMan(d) { return { man: 1, id: d.id, rj: d.rj, pk: d.pk, n: d.n, sv: d.sv || '', jn: d.jn, mk: d.mk, ket: d.ket || '', ex: (d.ex || []).slice() }; }
+function rsvKind(j) { var k = j ? (j.ck ? kdOf(j) : j.j) : ''; return ['ki', 'ck', 'tb', 'pem', 'las', 'cs'].indexOf(k) >= 0 ? k : ''; }
+function rsvInner(job) {
+  return job.rsv ? '<div class="rsvb-ok">' + ic('check', 'sm') + '<span>Anda sudah bisa reservasi mobil ini di menu Reservasi.</span></div><button class="btn ghost full pkbtn" data-act="rsvgo">' + ic('cal', 'sm') + ' Buka menu Reservasi</button>'
+    : '<div class="rsvb-h">Reservasi barang<small>Reservasi manual: ketik barang sendiri, boleh tambah dan tambah barang.</small></div><button class="btn ghost full pkbtn" id="rsvbtn" data-act="rsvmanual">' + ic('cal', 'sm') + ' Reservasi</button>';
+}
+/* blok tombol Reservasi di halaman pekerjaan (bukan Service Teknik: itu punya reservasi paket otomatis) */
+function rsvBlock(job) {
+  if (!job || job.cf || job.adm || job.gl || job.td || job.rv || !rsvKind(job) || !canMenu('rsv')) return '';
+  if (job.u && String(job.u).toLowerCase() !== String(meNip()).toLowerCase()) return '';
+  return '<div class="rsvb" id="rsvb">' + rsvInner(job) + '</div>';
+}
 /* ---- peran Reservasi: ASGH (membuat reservasi barang setelah di-ACC) dan Gudang (menyiapkan barang begitu mekanik mengajukan, tanpa menunggu ACC) ---- */
 function rsAsgh() { return !!(S.me && S.me.asgh); }
 function rsGdg() { return !!(S.me && S.me.gdg); }
@@ -4001,7 +4021,7 @@ function rsCount() {
   var ids = {};
   if (rsAcc()) R.pend.forEach(function (p) { if (!rsMine(p)) ids[p.id] = 1; });
   if (rsOps()) rsCards().forEach(function (d) { if (rsNeed(d)) ids[d.id] = 1; });
-  return (rsTeknik() ? R.cand.filter(function (c) { return !c.tdk; }).length : 0) + Object.keys(ids).length;
+  return (rsTeknik() ? R.cand.filter(function (c) { return !c.man && !c.tdk; }).length : 0) + R.cand.filter(function (c) { return c.man && rsMine(c); }).length + Object.keys(ids).length;
 }
 /* pemberitahuan reservasi baru untuk ASGH / Gudang (selain angka merah): muncul sekali saat data baru masuk, bukan saat pertama kali dimuat */
 function rsNotify() {
@@ -4077,13 +4097,22 @@ setInterval(function () { if (!document.hidden && S.me && S.data && S.auth === '
 function rsReset() { S.rs.cand = null; S.rs.pend = []; S.rs.done = []; S.rs.h = ''; S.rs.f = null; S.rs.tab = ''; S.rs.q = ''; S.rs.day = ''; S.rs.kg = null; S.rs.ka = null; S.rs.rsb = 0; rsBadge(); }
 function rsTab() { var R = S.rs; return rsOpsOnly() ? 'lap' : (R.tab || (rsAcc() && !rsTeknik() ? 'acc' : 'isi')); }
 /* daftar barang ke bawah (satu barang satu baris); barang tambahan diberi tanda */
-function rsChips(list, ex) {
+function rsChips(list, ex, notag) {
   var h = (list || []).map(function (x) { return '<li><span class="rs-dot"></span><b>' + esc(rsItemTxt(x)) + '</b></li>'; }).join('');
-  (ex || []).forEach(function (x) { h += '<li><span class="rs-dot"></span><b>' + esc(x) + '</b><em class="mn">tambahan</em></li>'; });
+  (ex || []).forEach(function (x) { h += '<li><span class="rs-dot"></span><b>' + esc(x) + '</b>' + (notag ? '' : '<em class="mn">tambahan</em>') + '</li>'; });
   return h ? '<ul class="rs-items sm">' + h + '</ul>' : '<span class="rs-none">Tidak ada barang</span>';
 }
 function rsJst(s) { return s === 'Berjalan' ? 'Sedang dikerjakan' : s === 'Tunda' ? 'Ditunda' : s === 'Selesai' ? 'Selesai dikerjakan' : ''; }
+function rsDraftCard(c) {
+  var mine = rsMine(c) || isAdmin();
+  return '<div class="ap-card rs-card ready"><div class="ap-c1">' + nchip(c.n) + rsPill(c) + '<span class="ap-ago">' + esc(pkDmy(c.t0)) + ' ' + hm(c.t0) + '</span></div>' +
+    '<div class="ap-c2"><b>' + esc(c.mk || '-') + '</b><span>' + esc(c.jn || '-') + '</span></div>' +
+    '<div class="ap-tx"><small>' + (c.rj === 'Susulan' ? 'Reservasi susulan' : 'Reservasi manual') + '</small><div class="rs-chips"><span class="rs-none">Ketik barang yang dibutuhkan sendiri. Boleh tambah dan tambah barang.</span></div></div>' +
+    (mine ? '<button class="btn pkdone ap-bt" data-act="rsopen" data-a="' + esc(c.id) + '">' + ic('cal', 'sm') + ' Isi Reservasi</button>'
+      : '<div class="ap-st own">' + ic('lock', 'sm') + '<span>Diisi oleh ' + esc(c.by || 'mekanik') + '.</span></div>') + '</div>';
+}
 function rsCandCard(c) {
+  if (c.man) return rsDraftCard(c);
   var tk = rsTeknik();
   return '<div class="ap-card rs-card' + (c.tdk ? ' own' : ' ready') + '"><div class="ap-c1">' + nchip(c.n) + (c.ns ? '<span class="pill pk-ck">Nomor S belum ada</span>' : '<span class="pill pk-teknik">Service ' + esc(c.sv) + '</span>') + '<span class="ap-ago">' + esc(pkDmy(c.lt || c.t0)) + ' ' + hm(c.lt || c.t0) + (rsJst(c.jst) ? '<br>' + esc(rsJst(c.jst)) : '') + '</span></div>' +
     '<div class="ap-c2"><b>' + esc(c.mk || '-') + '</b><span>' + esc(c.jn || '-') + '</span></div>' +
@@ -4093,10 +4122,10 @@ function rsCandCard(c) {
       : '<div class="ap-st own">' + ic('lock', 'sm') + '<span>Diisi oleh mekanik Service Teknik.</span></div>') + '</div>';
 }
 function rsPendCard(p) {
-  var own = rsMine(p), apv = rsAcc(), tk = rsTeknik();
-  return '<div class="ap-card rs-card ' + (apv && !own ? 'ready' : 'own') + '"><div class="ap-c1">' + nchip(p.n) + '<span class="pill pk-teknik">Service ' + esc(p.sv) + '</span><span class="ap-ago">' + esc(pkDmy(p.at)) + ' ' + hm(p.at) + '</span></div>' +
+  var own = rsMine(p), apv = rsAcc(), tk = p.rj ? (own || isAdmin()) : rsTeknik();
+  return '<div class="ap-card rs-card ' + (apv && !own ? 'ready' : 'own') + '"><div class="ap-c1">' + nchip(p.n) + rsPill(p) + '<span class="ap-ago">' + esc(pkDmy(p.at)) + ' ' + hm(p.at) + '</span></div>' +
     '<div class="ap-c2"><b>' + esc(p.mk || '-') + '</b><span>' + esc(p.jn || '-') + '</span></div>' +
-    '<div class="ap-tx"><small>Barang yang direservasi (' + (p.au.length + p.ex.length) + ')</small><div class="rs-chips">' + rsChips(p.au, p.ex) + '</div></div>' +
+    '<div class="ap-tx"><small>Barang yang direservasi (' + (p.au.length + p.ex.length) + ')</small><div class="rs-chips">' + rsChips(p.au, p.ex, !!p.rj) + '</div></div>' +
     (p.ket ? '<div class="ap-tx"><small>Keterangan</small>' + esc(p.ket) + '</div>' : '') +
     '<div class="ap-st ' + (apv && !own ? 'ok' : 'own') + '">' + ic(apv && !own ? 'shield' : 'clock', 'sm') + '<span>' + (own && apv ? 'Anda yang mengajukan. Harus di-ACC Group Head / Section Head lain.' : 'Diajukan ' + esc(p.by || '-') + '. Menunggu ACC Group Head / Section Head.') + '</span></div>' +
     '<div class="ap-bts' + (apv && tk ? '' : ' one') + '">' +
@@ -4110,7 +4139,7 @@ function rsOrdered(d) {
 }
 function rsItemsList(d, act) {
   var id = esc(d.id), h = rsOrdered(d).map(function (x) {
-    return '<li' + (x.rv ? ' class="rv"' : '') + '><span class="rs-dot"></span><b>' + esc(x.t) + '</b>' + (x.man ? '<em class="mn">tambahan</em>' : '') +
+    return '<li' + (x.rv ? ' class="rv"' : '') + '><span class="rs-dot"></span><b>' + esc(x.t) + '</b>' + (x.man && !d.rj ? '<em class="mn">tambahan</em>' : '') +
       (d.lg ? '' : x.rv ? (act ? '<button class="rs-undo" data-act="rsrvx" data-a="' + id + '" data-b="' + x.i + '">Batal</button>' : '<em>Sudah direservasi</em>')
         : (act ? '<button class="rs-do" data-act="rsrv" data-a="' + id + '" data-b="' + x.i + '">' + ic('check', 'sm') + ' Direservasi</button>' : '')) + '</li>';
   }).join('');
@@ -4138,7 +4167,8 @@ function rsLapCard(d) {
   if (rsGdg() && !d.lg) bt += d.sb ? '<button class="btn ghost ap-bt" data-act="rssiap" data-a="' + id + '" data-b="0">Batalkan tanda disiapkan</button>'
     : '<button class="btn pkdone ap-bt" data-act="rssiap" data-a="' + id + '" data-b="1">' + ic('check', 'sm') + ' Barang sudah disiapkan</button>';
   if (acc) bt += '<button class="btn ghost ap-bt" data-act="rsview" data-a="' + id + '">' + ic('report', 'sm') + ' Laporan Reservasi</button>';
-  return '<div class="ap-card rs-card' + (rsNeed(d) ? '' : ' done') + '" data-rs="' + id + '"><div class="ap-c1">' + nchip(d.n) + '<span class="pill pk-teknik">Service ' + esc(d.sv) + '</span><span class="ap-ago">' + esc(pkDmy(d.at)) + ' ' + hm(d.at) + '</span></div>' +
+  if (acc && !d.lg && rsMek() && rsMy(d)) bt += '<button class="btn ghost ap-bt" data-act="rsagain" data-a="' + id + '">' + ic('plus', 'sm') + ' Butuh reservasi lagi</button>';
+  return '<div class="ap-card rs-card' + (rsNeed(d) ? '' : ' done') + '" data-rs="' + id + '"><div class="ap-c1">' + nchip(d.n) + rsPill(d) + '<span class="ap-ago">' + esc(pkDmy(d.at)) + ' ' + hm(d.at) + '</span></div>' +
     '<div class="ap-c2"><b>' + esc(d.mk || '-') + '</b><span>' + esc(d.jn || '-') + '</span></div>' + rsBanner(d) +
     '<div class="ap-tx"><small>Barang (' + rsAllIt(d).length + ')</small>' + rsItemsList(d, act) + '</div>' +
     (d.ket ? '<div class="ap-tx"><small>Keterangan</small>' + esc(d.ket) + '</div>' : '') +
@@ -4153,7 +4183,7 @@ function rsInDay(ms, carry) {
   dd = isoOf(new Date(ms));
   return dd === d0 || (!!carry && d0 === t0 && dd < t0);
 }
-function rsCandRows() { return (S.rs.cand || []).filter(function (c) { return rsInDay(c.lt || c.t0, !c.tdk); }); }          /* mobil yang belum dijawab terbawa ke hari ini; yang sudah dijawab Tidak hanya di tanggalnya */
+function rsCandRows() { return (S.rs.cand || []).filter(function (c) { return (!c.man || rsMine(c) || isAdmin()) && rsInDay(c.lt || c.t0, !c.tdk); }); }          /* Draft manual / susulan hanya terlihat pembuatnya (dan Admin) */          /* mobil yang belum dijawab terbawa ke hari ini; yang sudah dijawab Tidak hanya di tanggalnya */
 function rsPendRows() { return (S.rs.pend || []).filter(function (p) { return rsInDay(p.at, true); }); }          /* yang menunggu ACC tidak boleh hilang: terbawa ke hari ini */
 function rsDayCur() { var d = S.rs.day; return d === 'all' ? 'all' : (d || todayIso()); }
 /* isi tab Laporan: reservasi pada tanggal yang dipilih (default hari ini). Yang belum tuntas untuk peran ASGH / Gudang tetap muncul di hari ini walau dibuat kemarin. */
@@ -4186,7 +4216,7 @@ function rsListHtml() {
   if (!R.cand) return '<div class="empty">Memuat Reservasi...</div>';
   var today = rsDayCur() === todayIso();
   if (tab === 'isi') { var ci = rsCandRows(); body = ci.length ? '<div class="ap-list">' + ci.map(rsCandCard).join('') + '</div>'
-    : today ? '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang perlu diisi</b>Mobil yang sedang Anda kerjakan di Service Teknik otomatis muncul di sini.</div>'
+    : today ? '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang perlu diisi</b>Mobil yang sedang Anda kerjakan di Service Teknik otomatis muncul di sini. Untuk pekerjaan lain, tekan tombol Reservasi di halaman pekerjaannya.</div>'
       : '<div class="empty">Tidak ada mobil Service Teknik pada tanggal ini.</div>'; }
   else if (tab === 'acc') { var pa = rsPendRows(); body = pa.length ? '<div class="ap-list">' + pa.map(rsPendCard).join('') + '</div>'
     : today ? '<div class="empty ap-empty">' + ic('check') + '<b>Tidak ada yang menunggu ACC</b>Reservasi yang diajukan mekanik muncul di sini.</div>'
@@ -4226,8 +4256,22 @@ function rsItemsHtml(f) {
   return '<div class="rs-warn">' + ic('warn', 'sm') + '<span>' + (f.ns && !f.sv ? 'Isi nomor S dulu, barang otomatis akan muncul sesuai jenis mobil.' : f.nk ? 'Jenis mobil belum dikenali, barang otomatis tidak tersedia. Isi barang secara manual di bawah.' : 'Tidak ada barang otomatis untuk servis ini.') + '</span></div>';
 }
 function rsItemsUi() { var el = $('#rs_items'), f = S.rs.f; if (el && f) el.innerHTML = rsItemsHtml(f); }
+function vRsvManForm(f) {
+  var ex = f.ex.concat(['']).map(rsExInput).join('');
+  return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (f.rj === 'Susulan' ? 'Reservasi Susulan' : 'Reservasi Manual') + '</h2></div>' +
+    '<section class="pad"><div class="rs-form">' +
+    '<dl class="kv"><dt>Nomor mobil</dt><dd><b>' + esc(f.n) + '</b></dd><dt>Mekanik</dt><dd>' + esc(f.mk || '-') + '</dd><dt>Jenis</dt><dd>' + esc(f.jn || '-') + '</dd><dt>Reservasi</dt><dd>' + esc(rsLbl(f)) + '</dd></dl>' +
+    '<label for="rs_ket">Keterangan <em>opsional</em></label><textarea id="rs_ket" rows="2" maxlength="300" placeholder="Catatan untuk Group Head / Section Head">' + esc(f.ket || '') + '</textarea>' +
+    '<h3 class="rs-h">Barang yang dibutuhkan <em>ketik manual</em></h3><div id="rs_ex" class="rs-ex">' + ex + '</div>' +
+    '<button type="button" class="btn ghost full rs-more" data-act="rsexadd">' + ic('plus', 'sm') + ' Tambah barang</button>' +
+    '<div class="pkyn"><button class="btn pkdone" id="rs_ya" data-act="rsya">' + ic('check', 'sm') + ' Kirim Reservasi</button><button class="btn ghost" id="rs_tdk" data-act="rstdk">Batalkan</button></div>' +
+    '<div class="rs-err" id="rs_err" role="alert"></div>' +
+    '<div class="pktd-h">Reservasi menunggu ACC Group Head / Section Head. Setelah di-ACC, muncul di Laporan Reservasi mobil ini. Boleh diubah selama belum di-ACC. Masih kurang setelah di-ACC? Tekan "Butuh reservasi lagi" di Laporan.</div>' +
+    '</div></section>';
+}
 function vRsvForm() {
   var f = S.rs.f; if (!f) return vRsv();
+  if (f.man) return vRsvManForm(f);
   var ex = (f.ex.length ? f.ex : ['']).concat(f.ex.length ? [''] : []).map(rsExInput).join('');
   var svRow = f.ns ? '<dt>Service</dt><dd><span class="rs-svin">S<input id="rs_sv" type="text" inputmode="numeric" maxlength="2" autocomplete="off" placeholder="12" value="' + esc(String(f.sv || '').replace(/\D/g, '')) + '" aria-label="Nomor S servis"></span><small class="rs-svh">Kode servis belum ada di data SAP. Isi nomor S (mis. 12).</small></dd>'
     : '<dt>Service</dt><dd>' + esc(f.sv0) + ' &middot; Service Teknik</dd>';
@@ -4250,10 +4294,29 @@ function rsExRead() {
 }
 function rsExGrow(el) {          /* isian terakhir terisi -> muncul isian baru di bawahnya */
   var box = $('#rs_ex'); if (!box || !el.classList.contains('rs-exi')) return;
+  var er = $('#rs_err'); if (er && er.textContent && el.value.trim()) er.textContent = '';          /* pesan "isi minimal satu barang" hilang begitu mulai mengetik */
   var all = box.querySelectorAll('.rs-exi');
   if (all[all.length - 1] === el && el.value.trim() && all.length < 15) box.insertAdjacentHTML('beforeend', rsExInput(''));
 }
+function rsSendMan(y) {
+  var f = S.rs.f, R = S.rs; if (!f || R.saving) return;
+  var ex = rsExRead(), ket = ($('#rs_ket') || {}).value || '', er = $('#rs_err');
+  if (y && !ex.length) { if (er) er.textContent = 'Isi minimal satu barang, atau pilih Batalkan.'; var f0 = document.querySelector('#rs_ex .rs-exi'); if (f0) f0.focus(); return; }
+  R.saving = 1; if (er) er.textContent = '';
+  ['rs_ya', 'rs_tdk'].forEach(function (id) { var b = $('#' + id); if (b) b.disabled = true; });
+  gs('rsvManualSimpan', [{ u: meNip(), id: f.id, y: y, ket: ket.replace(/\s+/g, ' ').trim(), ex: ex }]).then(function (r) {
+    R.saving = 0; R.f = null;
+    R.tab = r && r.locked ? 'lap' : (y ? 'acc' : 'isi'); R.h = '';
+    toast(r && r.locked ? 'Reservasi ini sudah di-ACC ' + ((r.ap || {}).by || '') : y ? 'Reservasi dikirim, menunggu ACC' : 'Reservasi dibatalkan');
+    go('rsv'); rsFetch(true);
+  }, function (e) {
+    R.saving = 0;
+    var er2 = $('#rs_err'); if (er2) er2.textContent = rsMsg(e);
+    ['rs_ya', 'rs_tdk'].forEach(function (id) { var b = $('#' + id); if (b) b.disabled = false; });
+  });
+}
 function rsSend(y) {
+  if (S.rs.f && S.rs.f.man) return rsSendMan(y);
   var f = S.rs.f, R = S.rs; if (!f || R.saving) return;
   var ex = rsExRead(), ket = ($('#rs_ket') || {}).value || '', er = $('#rs_err'), svn = f.ns ? (($('#rs_sv') || {}).value || '').replace(/\D/g, '') : '';
   if (y && f.ns && !(+svn >= 1 && +svn <= 99)) { if (er) er.textContent = 'Isi nomor S servis dulu (contoh: 12), atau pilih Tidak.'; var sf = $('#rs_sv'); if (sf) sf.focus(); return; }
@@ -4306,9 +4369,9 @@ function rsSiap(id, on) {
 }
 function rsAccModal(p) {
   showModal('<div class="sh-head"><b>ACC Reservasi</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="pkapsum"><b class="no">#' + esc(p.n) + '</b> <span class="pill pk-teknik">Service ' + esc(p.sv) + '</span>' +
+    '<div class="pkapsum"><b class="no">#' + esc(p.n) + '</b> ' + rsPill(p) +
     '<dl class="kv"><dt>Jenis</dt><dd>' + esc(p.jn || '-') + '</dd><dt>Mekanik</dt><dd>' + esc(p.mk || '-') + '</dd><dt>Diajukan</dt><dd>' + esc(p.by || '-') + '</dd></dl></div>' +
-    '<div class="ap-tx"><small>Barang yang direservasi</small><div class="rs-chips">' + rsChips(p.au, p.ex) + '</div></div>' +
+    '<div class="ap-tx"><small>Barang yang direservasi</small><div class="rs-chips">' + rsChips(p.au, p.ex, !!p.rj) + '</div></div>' +
     (p.ket ? '<div class="ap-tx" style="margin-top:8px"><small>Keterangan</small>' + esc(p.ket) + '</div>' : '') +
     '<div class="rs-err" id="rs_aerr" role="alert"></div>' +
     '<button class="btn full pkbtn pkdone" id="rs_accok" data-act="rsaccok" data-a="' + esc(p.id) + '">' + ic('shield', 'sm') + ' Ya, ACC Reservasi</button>');
@@ -4316,11 +4379,11 @@ function rsAccModal(p) {
 function rsViewModal(d) {
   var ord = rsOrdered(d);
   showModal('<div class="sh-head"><b>Laporan Reservasi</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="pkapsum"><b class="no">#' + esc(d.n) + '</b> <span class="pill pk-teknik">Service ' + esc(d.sv) + '</span>' +
+    '<div class="pkapsum"><b class="no">#' + esc(d.n) + '</b> ' + rsPill(d) +
     '<dl class="kv"><dt>Jenis</dt><dd>' + esc(d.jn || '-') + '</dd><dt>Mekanik</dt><dd>' + esc(d.mk || '-') + '</dd><dt>Diajukan</dt><dd>' + esc(d.by || '-') + ' &middot; ' + pkDmy(d.at) + '</dd><dt>Di-ACC</dt><dd>' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</dd>' +
     (d.lg ? '' : '<dt>Direservasi</dt><dd>' + (d.rb ? esc(d.rb) + (d.rw ? ' &middot; ' + hm(d.rw) + ' &middot; ' + pkDmy(d.rw) : '') : 'Belum') + '</dd><dt>Gudang</dt><dd>' + (d.sb ? 'Disiapkan ' + esc(d.sb) + (d.sw ? ' &middot; ' + hm(d.sw) + ' &middot; ' + pkDmy(d.sw) : '') : 'Belum disiapkan') + '</dd>') + '</dl></div>' +
     '<table class="rs-tbl"><thead><tr><th>No</th><th>Barang</th><th>Sumber</th>' + (d.lg ? '' : '<th>Status</th>') + '</tr></thead><tbody>' +
-    ord.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.t) + '</td><td>' + (x.man ? 'Tambahan' : 'Otomatis') + '</td>' + (d.lg ? '' : '<td>' + (x.rv ? 'Sudah direservasi' : 'Belum') + '</td>') + '</tr>'; }).join('') + '</tbody></table>' +
+    ord.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.t) + '</td><td>' + (x.man ? (d.rj || 'Tambahan') : 'Otomatis') + '</td>' + (d.lg ? '' : '<td>' + (x.rv ? 'Sudah direservasi' : 'Belum') + '</td>') + '</tr>'; }).join('') + '</tbody></table>' +
     (d.ket ? '<div class="ap-tx" style="margin-top:8px"><small>Keterangan</small>' + esc(d.ket) + '</div>' : '') +
     '<button class="btn full pkbtn" data-act="rsxl1" data-a="' + esc(d.id) + '">' + ic('report', 'sm') + ' Unduh Excel</button>');
 }
@@ -4334,7 +4397,7 @@ function rsBuildBook(list, title) {
   list.forEach(function (d) {
     rsOrdered(d).forEach(function (b) {
       no++;
-      var vals = [no, pkDmy(d.at), d.n, d.jn || '', d.sv, b.t, b.man ? 'Tambahan' : 'Otomatis', d.lg ? '-' : (b.rv ? 'Sudah direservasi' : 'Belum direservasi'), d.mk || '', d.by || '',
+      var vals = [no, pkDmy(d.at), d.n, d.jn || '', d.rj ? rsLbl(d) : d.sv, b.t, b.man ? (d.rj || 'Tambahan') : 'Otomatis', d.lg ? '-' : (b.rv ? 'Sudah direservasi' : 'Belum direservasi'), d.mk || '', d.by || '',
         d.st === 'Disetujui' ? 'Di-ACC ' + pkDmy(d.aw) : 'Menunggu ACC', d.ap || '', d.lg ? '-' : (d.sb ? d.sb + (d.sw ? ' ' + pkDmy(d.sw) : '') : 'Belum'), d.ket || ''], cen = { 1: 1, 2: 1, 3: 1, 5: 1, 7: 1, 8: 1, 11: 1 };
       vals.forEach(function (v, c) { sh.put(r, c + 1, v, cen[c + 1] ? st.tc : st.td); });
       r++;
@@ -4364,10 +4427,41 @@ var ACT = {
   rsrvx: function (a, b) { rsReserve(a, [+b], 0); },
   rsrvall: function (a) { rsReserve(a, null, 1); },
   rssiap: function (a, b) { rsSiap(a, b === '0' ? 0 : 1); },
+  rsvmanual: function () {
+    var j = S.pk.job, k = rsvKind(j), R = S.rs; if (!j || !k || R.mb) return;
+    var b = $('#rsvbtn'); R.mb = 1; if (b) b.disabled = true;
+    gs('rsvManual', [{ u: meNip(), n: j.n, j: k, jid: j.id }]).then(function (r) {
+      R.mb = 0; j.rsv = (r && r.id) || 'ok'; pkJobSave(); R.h = ''; rsFetch(true);
+      var bx = $('#rsvb'); if (bx && S.pk.job === j) bx.innerHTML = rsvInner(j);
+    }, function (e) { R.mb = 0; var b2 = $('#rsvbtn'); if (b2) b2.disabled = false; toast(rsMsg(e), true); });
+  },
+  rsvgo: function () { S.rs.tab = 'isi'; go('rsv'); },
+  rsagain: function (a) {
+    var R = S.rs; if (R.mb) return;
+    if (!rsMek()) { toast('Reservasi susulan dibuat oleh mekanik yang mengerjakan mobil ini.', true); return; }
+    R.mb = 1;
+    gs('rsvAgain', [{ u: meNip(), id: a }]).then(function (r) {
+      R.mb = 0; R.h = '';
+      if (r && r.d) { R.f = rsFormMan(r.d); R.saving = 0; go('rsvform'); }
+      rsFetch(true);
+    }, function (e) { R.mb = 0; toast(rsMsg(e), true); });
+  },
+  rsexadd: function () {
+    var box = $('#rs_ex'); if (!box) return;
+    var all = box.querySelectorAll('.rs-exi'), last = all[all.length - 1];
+    if (all.length >= 15) { toast('Maksimal 15 barang.', true); return; }
+    if (last && !last.value.trim()) { last.focus(); return; }
+    box.insertAdjacentHTML('beforeend', rsExInput(''));
+    var nw = box.querySelectorAll('.rs-exi'); nw[nw.length - 1].focus();
+  },
   rsopen: function (a) {
-    if (!rsTeknik()) { toast('Hanya mekanik Service Teknik yang mengisi Reservasi.', true); return; }
     var x = rsFind(a); if (!x) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
-    var c = x.c, p = x.p;
+    var c = x.c, p = x.p, mm = c && c.man ? c : (p && p.rj ? p : null);
+    if (mm) {          /* reservasi manual / susulan: hanya pembuatnya (atau Admin) */
+      if (!(rsMine(mm) || isAdmin())) { toast('Reservasi ini dibuat ' + (mm.by || 'mekanik lain') + '.', true); return; }
+      S.rs.f = rsFormMan(mm); S.rs.saving = 0; go('rsvform'); return;
+    }
+    if (!rsTeknik()) { toast('Hanya mekanik Service Teknik yang mengisi Reservasi.', true); return; }
     S.rs.f = c ? { n: c.n, sv0: c.sv, sv: c.sv, ns: c.ns ? 1 : 0, kd: c.kd || '', jn: c.jn, mk: c.mk, it: c.it, nk: c.nk, ket: c.ket || '', ex: [] }
       : { n: p.n, sv0: p.sv, sv: p.sv, ns: 0, kd: '', jn: p.jn, mk: p.mk, it: p.au, nk: 0, ket: p.ket || '', ex: p.ex.slice() };
     S.rs.saving = 0; go('rsvform');
