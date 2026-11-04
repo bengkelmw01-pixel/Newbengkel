@@ -30,10 +30,11 @@ var S = {
   pem: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   las: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   ls: { d: '', rm: '', mode: 'hari', jenis: 'all', q: '', rows: {}, busy: {}, err: '', open: '', det: {}, dl: 0 },
+  rd: { d: '', rm: '', mode: 'hari', rows: {}, busy: {}, err: '' },
   me: null, auth: 'wait', loginNip: '', loginErr: '', loginBusy: false,
   users: { rows: null, presets: [], setup: false, err: '', busy: false, old: '', ak: null },
   zp: { rows: null, done: [], h: '', busy: false, err: '', last: 0 }, iz: null,
-  ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
+  ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik', 'Kerusakan lain'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
   td: { rows: null, ssel: [], sel: [], loc: [], h: '', busy: false, err: '' },
   rs: { cand: null, pend: [], done: [], h: '', busy: false, err: '', last: 0, tab: '', q: '', f: null, saving: 0, dl: 0, day: '', kg: null, ka: null, rsb: 0 },
   lc: { d: '', rows: null, h: '', err: '', busy: 0, n: '', cek: null, cekWait: 0, cekFor: '', fo: [null, null, null], up: {}, busyS: 0, prog: '', rq: '', msg: '', done: null, tgt: null, af: null }
@@ -165,6 +166,7 @@ function go(v) {
   }
   if (v === 'jobpk' && S.view !== 'jobpk' && !S.pk.job) S.pk.n = '';
   if ((v === 'ck' || v === 'tb' || v === 'pem' || v === 'las') && S.view !== 'ck' && S.view !== 'tb' && S.view !== 'pem' && S.view !== 'las' && S.view !== 'jobpk' && S.view !== 'lc') { S[v].d = todayIso(); S[v].q = ''; S[v].st = 'all'; }
+  if (v === 'redo' && S.view !== 'redo') { S.rd.d = todayIso(); S.rd.rm = S.rd.d.slice(0, 7); }
   if (v === 'lapsvc' && S.view !== 'lapfokus' && S.view !== 'lapsvc') { S.ls.d = todayIso(); S.ls.rm = S.ls.d.slice(0, 7); S.ls.q = ''; S.ls.jenis = 'all'; }
   if (v !== S.view) S.prev = S.view;
   S.view = v; closeMenu(); closeModal();
@@ -174,6 +176,7 @@ function go(v) {
   if (v === 'mon') monFetch();
   if (v.indexOf('jam') === 0) jamFetch(ljYm());
   if (v === 'lapsvc') lsFetch(lsYm());
+  if (v === 'redo') rdFetch(rdYm(), true);
   if (v === 'ck' || v === 'tb' || v === 'pem' || v === 'las') ckFetch(v, S[v].d);
   if (v === 'tb') tbRegFetch();
   if (v === 'jobmek') ckWarm();
@@ -207,7 +210,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-04 08:32';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-04 10:22';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -245,6 +248,7 @@ function renderShell() {
   else if (v === 'lc') h = vLc();
   else if (v === 'lapsvc') h = vLapSvc();
   else if (v === 'lapfokus') h = vLapFokus();
+  else if (v === 'redo') h = vRedo();
   else if (v === 'jam') h = vJam();
   else if (v === 'jamharian') h = vJamHari();
   else if (v === 'jambulan') h = vJamBulan();
@@ -1189,7 +1193,7 @@ var LAPPAGE = 30, PAGE = 100;
 
 function renderList() {
   if (S.view === 'jobpk') return pkShow();
-  if (S.view.indexOf('jam') === 0 || S.view === 'nomo' || S.view === 'lapsvc' || S.view === 'lapfokus') return;
+  if (S.view.indexOf('jam') === 0 || S.view === 'nomo' || S.view === 'lapsvc' || S.view === 'lapfokus' || S.view === 'redo') return;
   var el = $('#list'); if (!el || !S.data) return;
   var v = S.view, q = norm(S.q[v] || '').trim();
   if (v === 'dash') return listLap(el, q);
@@ -1635,7 +1639,7 @@ function pkTick() {
   var el = S.view === 'jobpk' ? $('#pktime') : (S.view === 'nomo' ? $('#pktime2') : null);
   if (el) el.innerHTML = pkTimeHtml(j);
 }
-function pkTick2() { pkTick(); pkBgTick(); }
+function pkTick2() { pkTick(); pkBgTick(); izTmTick(); }
 setInterval(pkTick2, 250);
 
 /* ---------- Bantuan Mekanik (Service Teknik) ----------
@@ -1917,6 +1921,65 @@ function brkActs(job, back) {
     '<button class="btn full pkbtn pkdone" id="brk_go" data-act="brkresume">' + ic('wrench') + ' ' + (over ? 'Lanjutkan Pekerjaan' : 'Lanjutkan Sekarang') + '</button>' + back;
 }
 
+/* ---------- Jam pulang shift: Shift 1 pulang 15:00, Shift 3 pulang 07:00 (belum diatur = Shift 1, sama seperti di Laporan Jam Mekanik) ----------
+   Pekerjaan yang masih berjalan saat jam pulang: muncul pertanyaan "lanjut, tunda, atau selesai?".
+   Lanjut = jam terus berjalan, ditanya lagi 10 menit kemudian. Tunda = pekerjaan Tunda ("Tunda karena pulang shift"), jam berhenti. Selesai = buka halaman pekerjaan (ditanya lagi 10 menit kemudian bila belum selesai).
+   Tidak dijawab 2 menit = ditunda otomatis, jam berhenti pada jam pertanyaan itu muncul (juga bila aplikasi sedang ditutup: berlaku saat aplikasi dibuka lagi). Berlaku untuk shift pagi dan shift malam.
+   Corrective Supporting tidak bisa ditunda: hanya pengingat lanjut / selesai, tanpa tunda otomatis. */
+var SFT_TC = 'Tunda karena pulang shift';
+var SFT_END = { '1': [15, 0], '3': [7, 0] };
+var SFT_AGAIN = 10 * 60000;
+var SFT_WAIT = 2 * 60000;
+var SFT = { ask: '' };
+function sftShift() { return S.me && String(S.me.shift) === '3' ? '3' : '1'; }
+function sftEndAfter(from) {          /* jam pulang berikutnya SESUDAH waktu `from` (ms) */
+  var w = SFT_END[sftShift()], d0 = new Date(from), k, t = 0;
+  for (k = 0; k < 3; k++) { t = new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + k, w[0], w[1]).getTime(); if (t > from) return t; }
+  return t;
+}
+function sftElig(j) { return !!j && !j.e && !j.cf && !j.rv && !j.ap && j.j !== 'bm' && !j.gl && !j.adm; }          /* pekerjaan berjalan milik sendiri; Bantuan Mekanik dan pekerjaan yang diselesaikan admin tidak ikut */
+function sftTdOk(j) { return j.j !== 'cs'; }          /* Corrective Supporting tidak bisa ditunda */
+function sftDue(j) { return j.sq > 0 ? j.sq : sftEndAfter(Math.max(j.s, j.rs || 0)); }          /* kapan pertanyaan berikutnya muncul */
+function sftList() { return [S.pk.job].concat(S.pk.bg || []).filter(sftElig); }
+function sftOurs() { return !!$('#sft_ask'); }
+function sftEligResume(j, nw) { return j.j !== 'bm' && !j.gl && !j.adm && sftDue(j) <= nw; }          /* pekerjaan yang baru dilanjutkan tetapi pertanyaan pulang shiftnya sudah lewat */
+function sftPauseOne(j, at) {
+  if (at <= j.s) at = j.s + 1000;
+  if (j === S.pk.job && j.ck && kdOf(j) !== 'tb') { var ta = $('#pk_t'); if (ta) j.t = ta.value; }          /* isian Tindakan yang sedang diketik ikut tersimpan */
+  j.e = at; j.td = 1; j.tc = SFT_TC; j.sft = 1; j.ap = null; bnCancelFor(j);
+}
+function sftTick() {
+  if (!S.me || S.auth !== 'ok') return;
+  var now = Date.now(), L = sftList(), lead = null, d0 = 0, ch = false, key;
+  if (!L.length) return;
+  L.forEach(function (j) { var d = sftDue(j); if (sftTdOk(j) && now >= d + SFT_WAIT) { sftPauseOne(j, d); ch = true; } });          /* tidak dijawab 2 menit: ditunda otomatis pada jam pertanyaan muncul */
+  if (ch) {
+    if (sftOurs()) closeModal();
+    pkJobSave(); pkSync(); if (S.view === 'jobpk') pkShow();
+    toast('Jam pulang kerja: tidak ada jawaban, pekerjaan ditunda otomatis. Waktu berhenti.');
+    L = sftList();
+  }
+  L.forEach(function (j) { if (now >= sftDue(j) && (!lead || j === S.pk.job)) lead = j; });
+  if (!lead) return;
+  d0 = sftDue(lead); key = lead.id + ':' + d0;
+  if (SFT.ask === key) { var cd = $('#sft_cd'); if (cd) cd.textContent = brkCd(d0 + SFT_WAIT - now); }
+  else if (!brkModalOpen()) sftAsk(lead, d0);
+}
+setInterval(sftTick, 1000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) sftTick(); });
+function sftAsk(j, d0) {
+  SFT.ask = j.id + ':' + d0;
+  var td = sftTdOk(j), o = sftList().length - 1, sf = sftShift() === '3' ? 'Shift 3 &middot; pulang 07:00' : 'Shift 1 &middot; pulang 15:00';
+  showModal('<div class="sh-head"><b id="sft_ask">Jam pulang kerja</b></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(j.n) + '</b> <span class="pill pk-' + pkK(j) + '">' + PKJ[pkK(j)] + '</span>' +
+    '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(j.un || meNama()) + '</dd><dt>Shift</dt><dd>' + sf + '</dd><dt>Sudah berjalan</dt><dd>' + pkDur(pkEl(j, Date.now())) + '</dd>' + (o > 0 ? '<dt>Pekerjaan lain</dt><dd>' + o + ' pekerjaan lagi ikut ditanya</dd>' : '') + '</dl></div>' +
+    '<div class="pkq">Pekerjaan masih berjalan. ' + (td ? 'Lanjut, tunda, atau selesai?' : 'Lanjut atau selesai?') +
+    '<small>' + (td ? 'Jika tidak dijawab dalam <b class="sft-cd" id="sft_cd">' + brkCd(d0 + SFT_WAIT - Date.now()) + '</b>, pekerjaan ditunda otomatis dan jam berhenti pukul ' + hm(d0) + '. ' : 'Corrective Supporting tidak bisa ditunda. ') + 'Jika lanjut, Anda ditanya lagi 10 menit kemudian.</small></div>' +
+    '<button class="btn full pkbtn pkdone" data-act="sftlanjut">' + ic('wrench') + ' Lanjut kerja</button>' +
+    (td ? '<button class="btn full pkbtn pktunda-ok" data-act="sfttunda">' + ic('clock') + ' Tunda</button>' : '') +
+    '<button class="btn ghost full pkbtn" data-act="sftselesai">' + ic('check') + ' Selesai</button>');
+}
+
 function vPk() {
   var p = S.pk;
   var sub = '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>' + (p.job && p.job.ck ? KDC[kdOf(p.job)].t : (p.job && p.job.j === 'cs' ? 'Corrective Supporting' : (p.job && p.job.j === 'bm' ? 'Bantuan Mekanik' : 'Preventive Kendaraan'))) + '</h2></div>';
@@ -2034,7 +2097,7 @@ function csBegin(f, ex) {
   var cur = S.pk.job;
   if (pkBlock(cur, 'cs')) return;
   pkLeave(cur);
-  var t0 = Date.now(), used = {}, mkId = function () { var id; do { id = 'J' + t0 + Math.random().toString(36).slice(2, 5); } while (used[id]); used[id] = 1; return id; };
+  var t0 = izT0(), used = {}, mkId = function () { var id; do { id = 'J' + t0 + Math.random().toString(36).slice(2, 5); } while (used[id]); used[id] = 1; return id; };
   var mk = function (ff, id, gl) { return { id: id, n: ff.n, j: 'cs', s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: '', lfi: null, u: meNip(), un: meNama(), cf: '', gl: gl || undefined, cs: { p: S.cs.p, pl: ff.pl || '', fr: ff.fr ? 1 : 0 } }; };
   var lead = mk(f, mkId());
   if (ex && ex.length) {
@@ -2152,7 +2215,7 @@ function pkSvCode(n) {
   return /^[A-Z]\d{1,3}$/.test(c) ? c : '';
 }
 function pkBegin(n, jn, lf, td) {
-  var t0 = Date.now();
+  var t0 = izT0();
   S.pk.job = { id: 'J' + t0 + Math.random().toString(36).slice(2, 5), n: n, j: jn, s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: meNip(), un: meNama(), cf: '' };
   if (td && td.tc === BRK_TC) S.pk.job.pre = (td.cm != null ? td.cm : (td.m || 0)) * 60000;          /* meneruskan tunda istirahat: jam kerja meneruskan yang tadi (hanya tampilan; Laporan Jam tetap satu baris per sesi) */
   if (jn === 'teknik') { var sv0 = pkSvCode(n); if (sv0) S.pk.job.sv = sv0; }          /* Kode Servis (S12) dikirim ke Laporan Jam Mekanik: dasar barang Reservasi */
@@ -2575,6 +2638,10 @@ document.addEventListener('error', function (e) {
   t.parentNode.replaceChild(s, t);
 }, true);
 
+/* armada pool lain (mis. taksi kode OE: OE5779; kode lain boleh bertambah): kode huruf selain MWD (pool kita) + angka, tidak ada di Master; laporan CK-nya tetap boleh dikerjakan dengan nomor apa adanya.
+   Nomor berawalan MWD yang tidak ada di Master dianggap salah ketik: tetap harus pilih mobil Master. Harus sama dengan poolLain_ di Code.gs. */
+function ckPoolLain(kd, n) { n = String(n || '').toUpperCase(); return kd === 'ck' && !(S.mi && S.mi[n]) && /^[A-Z]{1,4}\d{1,6}$/.test(n) && n.indexOf('MWD') !== 0; }
+function ckPoolLbl(n) { return 'Pool lain (' + String(n || '').toUpperCase().replace(/\d+$/, '') + ')'; }
 function ckTg(r) {
   return '<div class="ck-tg"><span class="ck-td">' + esc(dLong(r.d)) + '</span>' + (r.jm ? '<span class="ck-jm">' + ic('clock', 'sm') + esc(r.jm) + '</span>' : '') + '</div>';
 }
@@ -2582,7 +2649,8 @@ function ckRow(kd, r) {
   var tb = kdTb(kd), pem = kd === 'pem', las = kd === 'las', s = ckSt(kd, r), n = s.n || r.n || '', m = S.mi[n] || null, typed = String(r.n0 || '').trim(), j = s.job, k = esc(r.k), b = ' data-b="' + kd + '"';
   var adm = ckAdmOk(kd, r, s);          /* admin boleh menyelesaikan pekerjaan mekanik lain yang sedang berjalan: No Mobil bisa diklik */
   var mob = (adm ? '<button type="button" class="ck-admchip" data-act="ckadm" data-a="' + k + '"' + b + ' title="Selesaikan atas nama ' + esc(s.who) + '" aria-label="Selesaikan atas nama ' + esc(s.who) + '">' + nchip(n || '-') + '</button>' : nchip(n || '-')) + (m && m.j ? '<span class="ck-jn">' + esc(m.j) + '</span>' : '');
-  if (!m) mob += '<span class="ck-warn">' + ic('warn', 'sm') + '<span>No Mobil tidak ada di Master.<span class="ck-wx"> Pilih yang benar saat menekan Kerjakan.</span></span></span>';
+  if (!m && ckPoolLain(kd, n)) mob += '<span class="ck-jn">' + esc(ckPoolLbl(n)) + '</span>';
+  else if (!m) mob += '<span class="ck-warn">' + ic('warn', 'sm') + '<span>No Mobil tidak ada di Master.<span class="ck-wx"> Pilih yang benar saat menekan Kerjakan.</span></span></span>';
   if (typed && pkNum(typed) !== n) mob += '<span class="ck-o">' + KDC[kd].tulis + ': <b>' + esc(typed) + '</b></span>';
   var kl = '<div class="ck-kltx">' + esc(r.kl || (r.lc ? 'LC (laporan petugas cat)' : '-')) + '</div>', tdk = s.s === 'done' ? (j ? j.t : r.t) : '', fsl = pem ? (j && j.ck && j.ck.cs && j.ck.cs.length ? j.ck.cs : (r.fs || [])) : (tb ? (j && pkFsOf(j).length ? pkFsOf(j) : (r.fs || [])) : []);
   if (pem) kl += '<div class="ck-fst"><small>' + ic('check', 'sm') + ' Foto selesai Cat</small>' + (fsl.length ? tbFotoHtml(r.k, fsl, false, 'pemfs', 'selesai cat') : '<span class="tb-nofo">Tidak ada foto</span>') + '</div>';
@@ -2751,9 +2819,13 @@ function askStart(o, fn) {
   setTimeout(function () { var b = $('#pk_go'); if (b) b.focus(); }, 60);
 }
 /* ---------- Izin mulai kerja PKL (sisi PKL): tekan Kerjakan -> minta ACC -> layar menunggu -> setelah disetujui pekerjaan baru dimulai (waktu mulai = saat disetujui) ---------- */
+/* Jam kerja PKL berjalan sejak menekan "Minta ACC", walaupun ACC belum turun: jam mulai pekerjaan = saat minta ACC (Z.t0). Bila ditolak / dibatalkan, pekerjaan tidak dimulai dan jam tidak dicatat. */
+var IZ_T0 = 0;
+function izT0() { var t = IZ_T0, now = Date.now(); return t > 1577836800000 && t <= now ? t : now; }
+function izTmTick() { var Z = S.iz, el = $('#iz_tm'); if (Z && Z.t0 && el) { var t = pkDur(Date.now() - Z.t0); if (el.textContent !== t) el.textContent = t; } }
 function izGate(o, fn) {
   izStop(false);
-  var Z = S.iz = { o: o, fn: fn, id: '', st: 'kirim', by: '', al: '', err: '', tm: 0, busy: 0 };
+  var Z = S.iz = { o: o, fn: fn, id: '', st: 'kirim', by: '', al: '', err: '', tm: 0, busy: 0, t0: Date.now() };
   izUi();
   gs('izinMinta', [{ u: meNip(), j: o.k, n: o.n, k: o.key || '', info: o.iz || '' }]).then(function (r) {
     if (S.iz !== Z) return;
@@ -2778,8 +2850,9 @@ function izTick(Z) {
 }
 function izRun(Z) {
   clearInterval(Z.tm); var fn = Z.fn; S.iz = null; closeModal();
-  toast('Disetujui' + (Z.by ? ' oleh ' + Z.by : '') + '. Selamat bekerja.');
-  if (fn) fn();
+  toast('Disetujui' + (Z.by ? ' oleh ' + Z.by : '') + '. Jam kerja dihitung sejak ' + hm(Z.t0) + '.');
+  IZ_T0 = Z.t0 || 0;          /* pkBegin / ckBegin / csBegin memakai jam minta ACC sebagai jam mulai */
+  try { if (fn) fn(); } finally { IZ_T0 = 0; }
 }
 function izStop(batal) {
   var Z = S.iz; if (!Z) return;
@@ -2791,9 +2864,9 @@ function izUi() {
   var Z = S.iz; if (!Z) return;
   var o = Z.o || {}, sum = '<div class="pkapsum"><b class="no">#' + esc(o.n || '') + '</b> <span class="pill pk-' + esc(o.k || '') + '">' + esc(o.t || '') + '</span></div>', h;
   if (Z.st === 'kirim') h = '<div class="iz-box" id="iz_box"><div class="loading"><div class="spinner"></div></div><b>Mengirim permintaan...</b></div>';
-  else if (Z.st === 'Menunggu') h = sum + '<div class="iz-box" id="iz_box"><div class="iz-ic">' + ic('clock') + '</div><b>Menunggu ACC</b><small>Permintaan sudah dikirim ke Section Head / Group Head dan Devi. Layar ini lanjut sendiri setelah disetujui. Waktu kerja belum berjalan.</small>' +
+  else if (Z.st === 'Menunggu') h = sum + '<div class="iz-box" id="iz_box"><div class="iz-ic">' + ic('clock') + '</div><b>Menunggu ACC</b><div class="iz-tm" id="iz_tm">' + pkDur(Date.now() - Z.t0) + '</div><small>Jam kerja Anda sudah berjalan sejak <b>' + hm(Z.t0) + '</b>, tetap dihitung selama menunggu ACC. Permintaan sudah dikirim ke Section Head / Group Head dan Devi. Layar ini lanjut sendiri setelah disetujui. Bila ditolak atau dibatalkan, jam tidak dicatat.</small>' +
     '<button class="btn ghost full" data-act="izbatal">Batalkan permintaan</button></div>';
-  else if (Z.st === 'Ditolak') h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('x') + '</div><b>Ditolak</b><small>' + esc(Z.by ? 'Oleh ' + Z.by + '. ' : '') + esc(Z.al || 'Hubungi Section Head / Group Head atau Devi.') + '</small><button class="btn full" data-act="izclose">Tutup</button></div>';
+  else if (Z.st === 'Ditolak') h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('x') + '</div><b>Ditolak</b><small>' + esc(Z.by ? 'Oleh ' + Z.by + '. ' : '') + esc(Z.al || 'Hubungi Section Head / Group Head atau Devi.') + ' Jam kerja tidak dicatat.</small><button class="btn full" data-act="izclose">Tutup</button></div>';
   else if (Z.st === 'gagal') h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('warn') + '</div><b>Belum bisa meminta ACC</b><small>' + esc(Z.err || 'Periksa sinyal, lalu coba lagi.') + '</small><button class="btn full" data-act="izclose">Tutup</button></div>';
   else h = sum + '<div class="iz-box no" id="iz_box"><div class="iz-ic">' + ic('clock') + '</div><b>Permintaan berakhir</b><small>Tekan Kerjakan lagi untuk meminta ACC baru.</small><button class="btn full" data-act="izclose">Tutup</button></div>';
   showModal('<div class="sh-head"><b>Izin Mulai Kerja</b></div>' + h);
@@ -2901,7 +2974,7 @@ function ckBegin(kd, r, n, lf, td, ov) {          /* ov = { id, s }: meneruskan 
   var cur = S.pk.job;
   if (pkBlock(cur, kd)) return;
   pkLeave(cur);
-  var t0 = ov ? ov.s : Date.now();
+  var t0 = ov ? ov.s : izT0();
   S.pk.job = { id: ov ? ov.id : 'J' + t0 + Math.random().toString(36).slice(2, 5), n: n, j: kd, s: t0, e: 0, ok: 0, sg: '', t: '', ap: null, f: {}, fs: 0, fy: 0, cy: '',
     td: 0, tc: '', lf: lf || '', lfi: td ? { nm: td.nm, m: td.m } : null, u: ov && ov.u ? ov.u : meNip(), un: ov && ov.un ? ov.un : meNama(), cf: '',
     ck: kd === 'pem' ? { k: r.k, d: r.d, jm: r.jm || '', rg: r.rg || '', n0: r.n0 || '', fo: (r.fo || []).slice(0, 4), cs: (r.fs || []).slice(0, 6), kl: r.kl || '' }
@@ -3054,7 +3127,7 @@ function pkShowCk(el, job) {
     (tb ? '<dt>No Registrasi</dt><dd>' + esc(c.rg || '-') + '</dd>'
       : '<dt>Dilaporkan oleh</dt><dd>' + esc(c.nm || '-') + (c.nip ? '<br><small class="mut">NIP ' + esc(c.nip) + '</small>' : '') + '</dd>') +
     '<dt>Tanggal ' + (tb ? 'Masuk' : 'Laporan') + '</dt><dd>' + HARI[isoDow(c.d)] + ', ' + dd.d + ' ' + BULAN[dd.m - 1] + ' ' + dd.y + (c.jm ? ' &middot; ' + esc(c.jm) : '') + '</dd>' +
-    '<dt>Jenis</dt><dd>' + esc(m.j || '-') + '</dd>' +
+    '<dt>Jenis</dt><dd>' + esc(m.j || (ckPoolLain(kd, n) ? ckPoolLbl(n) : '-')) + '</dd>' +
     (typed && pkNum(typed) !== n ? '<dt>No Mobil Ditulis</dt><dd>' + esc(typed) + '<br><small class="mut">dikoreksi menjadi ' + esc(n) + '</small></dd>' : '') +
     (tb ? '<dt>Foto Kerusakan</dt><dd>' + tbFotoHtml(c.k, c.fo, true) + '</dd><dt>Detail Kerusakan</dt>' : '<dt>Keluhan</dt>') +
     '<dd class="ck-kld">' + esc(c.kl || '-') + '</dd>' +
@@ -3576,6 +3649,74 @@ function lsRefreshList() {
   b.innerHTML = lsBody();
   var sc = lsScope(), fl = sc ? lsFilter(sc) : [], n = fl.length, nf = lsFkN(fl), el = $('#ls_dln'), e2 = $('#ls_dlfn'); if (el) el.textContent = ' (' + n + ' laporan)'; if (e2) e2.textContent = ' (' + nf + ' form)';
   var b1 = $('[data-act="lsdl"]'), b2 = $('[data-act="lsdlf"]'); if (b1) b1.disabled = !n; if (b2) { b2.disabled = !nf; b2.style.display = nf ? '' : 'none'; }
+}
+
+/* ---------- Laporan Redo Job: laporan CK yang sudah di-ACC Group Head / Section Head ----------
+   Data dari server (getRedoJob, satu bulan). Jenis laporan: CK, Cek baik (pilihan pengawas); "Kerusakan lain" dihitung CK.
+   Keluhan yang memuat Ban / tambal ban / IOT / iyot / Lampu / Argo sudah disaring server. Service sebelumnya + Mekanik sebelumnya = service terakhir mobil itu (tab MEKANIK di data aplikasi) pada atau sebelum tanggal laporan. */
+function rdOn() { return S.view === 'redo'; }
+function rdYm() { var R = S.rd; return R.mode === 'bulan' ? R.rm : R.d.slice(0, 7); }
+function rdFetch(ym, force) {
+  var R = S.rd; if (!ym || R.busy[ym]) return Promise.resolve();
+  var cur = R.rows[ym]; R.busy[ym] = true;
+  return gs('getRedoJob', [ym, cur ? cur.h : '', !!force]).then(function (r) {
+    R.busy[ym] = false; R.err = ''; S.lastLoad = Date.now(); chk();
+    if (r && r.rows) { R.rows[ym] = r; if (rdOn() && rdYm() === ym) rerender(); }
+    else if (!cur && rdOn()) rerender();
+  }, function (er) {
+    R.busy[ym] = false; R.err = msg(er);
+    if (!cur && rdOn() && rdYm() === ym) rerender();
+  });
+}
+setInterval(function () { if (document.hidden || !rdOn() || !S.data) return; rdFetch(rdYm()); }, POLL_MS);
+function rdScope() {
+  var R = S.rd, D = R.rows[rdYm()]; if (!D) return null;
+  return R.mode === 'bulan' ? D.rows.slice() : D.rows.filter(function (r) { return r.d === R.d; });
+}
+/* persen CK dan Cek baik dari laporan yang jenisnya jelas; jumlahnya selalu 100% */
+function rdStats(rows) {
+  var o = { n: 0, ck: 0, cb: 0, pck: 0, pcb: 0, pall: 0 };
+  rows.forEach(function (r) { if (r.jn === 'CK') o.ck++; else if (r.jn === 'Cek baik') o.cb++; });
+  o.n = o.ck + o.cb;
+  if (o.n) { o.pck = Math.round(o.ck * 100 / o.n); o.pcb = 100 - o.pck; o.pall = 100; }
+  return o;
+}
+function rdTop() {
+  var R = S.rd, t0 = todayIso(), cur = t0.slice(0, 7), d = R.d, p = isoParts(d), nav;
+  if (R.mode === 'bulan') {
+    var off = R.rm >= cur;
+    nav = '<div class="ls-nav"><button class="lj-cb" data-act="rdmon" data-a="-1" aria-label="Bulan sebelumnya">' + ic('chev', 'flip') + '</button><div class="lbl"><b>' + ymLabel(R.rm) + '</b><small>Rekap laporan satu bulan</small></div>' +
+      '<button class="lj-cb' + (off ? ' off' : '') + '" data-act="rdmon" data-a="1" aria-label="Bulan berikutnya"' + (off ? ' disabled' : '') + '>' + ic('chev') + '</button></div>';
+  } else {
+    var offd = d >= t0;
+    nav = '<div class="ls-nav"><button class="lj-cb" data-act="rdday" data-a="-1" aria-label="Hari sebelumnya">' + ic('chev', 'flip') + '</button><div class="lbl"><b>' + HARI[isoDow(d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</b><small>Rekap laporan harian</small></div>' +
+      '<label class="lj-cb" aria-label="Pilih tanggal">' + ic('cal') + '<input type="date" id="rd_d" value="' + d + '" max="' + t0 + '"></label>' +
+      '<button class="lj-cb' + (offd ? ' off' : '') + '" data-act="rdday" data-a="1" aria-label="Hari berikutnya"' + (offd ? ' disabled' : '') + '>' + ic('chev') + '</button></div>';
+  }
+  var sc = rdScope() || [], st = rdStats(sc), pc = function (x) { return st.n ? x + '%' : '-'; };
+  return '<div class="ls-mode"><button class="' + (R.mode === 'hari' ? 'on' : '') + '" data-act="rdmode" data-a="hari">Harian</button><button class="' + (R.mode === 'bulan' ? 'on' : '') + '" data-act="rdmode" data-a="bulan">Bulanan</button></div>' + nav +
+    '<div class="ls-tiles rd-tiles"><div class="ls-tile"><b>' + pc(st.pall) + '</b><span>Presentase laporan (' + st.n + ')</span></div><div class="ls-tile ck"><b>' + pc(st.pck) + '</b><span>CK (' + st.ck + ')</span></div><div class="ls-tile cb"><b>' + pc(st.pcb) + '</b><span>Cek baik (' + st.cb + ')</span></div></div>';
+}
+function rdTable(rows) {
+  var R = S.rd, last = '', no = 0, tr = '';
+  rows.forEach(function (r) {
+    if (R.mode === 'bulan' && r.d !== last) { last = r.d; var p = isoParts(r.d); tr += '<tr class="rd-day"><td colspan="8">' + HARI[isoDow(r.d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</td></tr>'; }
+    no++;
+    var jn = r.jn ? '<span class="rd-jn ' + (r.jn === 'CK' ? 'ck' : 'cb') + '">' + esc(r.jn) + '</span>' + (r.kt === 'Kerusakan lain' ? '<small class="rd-sub">Kerusakan lain</small>' : '') : '<span class="mut">-</span>';
+    tr += '<tr><td class="no">' + no + '</td><td>' + jn + '</td><td><b>' + esc(r.n) + '</b></td><td class="kl">' + esc(r.kl || '-') + '</td><td class="kl">' + (r.ss ? esc(r.ss) + (r.sd ? '<small class="rd-sub">' + esc(dmyIso(r.sd)) + '</small>' : '') : '') + '</td><td>' + esc(r.ms || '') + '</td><td class="kl">' + esc(r.tk || '-') + '</td><td>' + esc(r.mk || '-') + '</td></tr>';
+  });
+  return '<div class="rd-w"><table class="rd-tbl"><thead><tr><th>No</th><th>Jenis laporan</th><th>Nomor mobil</th><th>Isi keluhan</th><th>Service sebelumnya</th><th>Mekanik sebelumnya</th><th>Keterangan</th><th>Mekanik yang kerjakan</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
+}
+function rdBody() {
+  var R = S.rd, sc = rdScope();
+  if (!sc) return R.err ? '<div class="empty">Gagal memuat Laporan Redo Job.<br><small>' + esc(R.err) + '</small><br><small>Pastikan Code.gs terbaru sudah dipasang di Apps Script (fungsi getRedoJob).</small></div>' : '<div class="empty">Memuat laporan...</div>';
+  if (!sc.length) return '<div class="empty">Belum ada laporan Redo Job ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '.<br><small>Muncul setelah Group Head / Section Head meng-ACC pekerjaan CK. Keluhan Ban, tambal ban, IOT, lampu, dan Argo tidak termasuk.</small></div>';
+  var er = (R.rows[rdYm()] || {}).e;
+  return (er ? '<div class="rd-note">Service sebelumnya belum terbaca dari data aplikasi: ' + esc(er) + '</div>' : '') + rdTable(sc) + '<div class="rd-hint">Geser tabel ke kanan untuk melihat kolom lainnya.</div>';
+}
+function vRedo() {
+  var head = '<div class="ls-head"><div class="ls-hi">' + ic('redo') + '</div><div><h3>Laporan Redo Job</h3><p>Laporan CK yang sudah di-ACC GH / SH</p></div></div>';
+  return banner() + '<section class="pad">' + errBanner() + head + '<div class="ls-box"><div id="rd_top">' + rdTop() + '</div><div id="rd_body">' + rdBody() + '</div></div>' + foot() + '</section>';
 }
 
 /* ----- model Form Fokus (dipakai tampilan layar dan file Excel) ----- */
@@ -4758,6 +4899,28 @@ var ACT = {
     closeModal(); toast('Tetap lanjut kerja, jam terus berjalan');
   },
   brkresume: function () { var j = S.pk.job; if (!(j && j.td && j.brk)) j = BRK.cur && S.pk.bg.indexOf(BRK.cur) >= 0 ? BRK.cur : null; brkResume(j); },
+  sftlanjut: function () {          /* lanjut kerja: jam terus berjalan, ditanya lagi 10 menit kemudian */
+    var now = Date.now();
+    sftList().forEach(function (j) { if (now >= sftDue(j)) j.sq = now + SFT_AGAIN; });
+    pkJobSave(); if (sftOurs()) closeModal();
+    toast('Lanjut kerja, jam terus berjalan. Ditanya lagi 10 menit lagi.');
+  },
+  sfttunda: function () {          /* tunda sekarang: semua pekerjaan yang berjalan (kecuali CS) ditunda, jam berhenti */
+    var now = Date.now(), L = sftList().filter(sftTdOk);
+    if (sftOurs()) closeModal();
+    if (!L.length) return;
+    L.forEach(function (j) { sftPauseOne(j, now); });
+    pkJobSave(); if (S.view === 'jobpk') pkShow(); pkSync();
+    toast('Pekerjaan ditunda karena pulang shift, waktu berhenti');
+  },
+  sftselesai: function () {          /* selesai: buka halaman pekerjaan; bila belum selesai, ditanya lagi 10 menit kemudian */
+    var L = sftList(), j = S.pk.job && sftElig(S.pk.job) ? S.pk.job : L[0], now = Date.now();
+    L.forEach(function (x) { if (now >= sftDue(x)) x.sq = now + SFT_AGAIN; });
+    pkJobSave(); if (sftOurs()) closeModal();
+    if (!j) return;
+    if (j === S.pk.job) { if (S.view === 'jobpk') pkShow(); else go('jobpk'); } else pkSwitch(j.id);
+    toast('Isi data lalu tekan Pengerjaan Selesai. Jika belum selesai, Anda ditanya lagi 10 menit lagi.');
+  },
   nojob: function (a) { toast('Akun Anda tidak punya akses ke ' + a + '.', true); },
   pkdone: function () {
     var j = S.pk.job; if (!j || j.e || j.cf) return;
@@ -4851,7 +5014,7 @@ var ACT = {
   apdo: function (a) {
     var A = S.ap, it = apFind(a); if (!it || A.saving) return;
     var er = $('#ap_err'), kt = '', kq = '', f;
-    if (it.j === 'ck') { f = $('#ap_kt'); kt = f ? f.value : ''; if (kt !== 'CK' && kt !== 'Cek baik') { er.textContent = 'Pilih Keterangan dulu: CK atau Cek baik.'; if (f) { f.classList.add('bad'); f.focus(); } return; } }
+    if (it.j === 'ck') { f = $('#ap_kt'); kt = f ? f.value : ''; if (A.kt.indexOf(kt) < 0) { er.textContent = 'Pilih Keterangan dulu: CK, Cek baik, atau Kerusakan lain.'; if (f) { f.classList.add('bad'); f.focus(); } return; } }
     if (it.j === 'tb') { f = $('#ap_kq'); kq = f ? f.value : ''; if (A.kq.indexOf(kq) < 0) { er.textContent = 'Pilih Kualitas dulu.'; if (f) { f.classList.add('bad'); f.focus(); } return; } }
     var bt = $('#ap_go'); A.saving = 1; if (bt) { bt.disabled = true; bt.textContent = 'Menyimpan...'; }
     gs('approvalSet', [{ u: meNip(), id: it.id, kt: kt, kq: kq }]).then(function (r) {
@@ -4907,7 +5070,14 @@ var ACT = {
   },
   pkresume: function () {
     var j = S.pk.job; if (!j || j.ap || j.cf || j.rv) return;
-    var lanjut = function () { if (S.pk.job !== j || j.ap) return; j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.pem = 0; pkGroupReopen(j); pkJobSave(); pkShow(); pkSync(); };
+    var lanjut = function () {
+      if (S.pk.job !== j || j.ap) return;
+      var nw = Date.now(), wasSft = !!j.sft;
+      if (wasSft) { j.bk = (j.bk || 0) + Math.max(0, nw - j.e); j.rs = nw; j.sft = 0; }          /* ditunda karena pulang shift: waktu sampai dilanjutkan tidak dihitung */
+      j.e0 = j.e; j.e = 0; j.td = 0; j.tc = ''; j.pem = 0;
+      if (wasSft || sftEligResume(j, nw)) j.sq = nw + SFT_AGAIN;          /* dilanjutkan sesudah jam pulang: ditanya lagi 10 menit kemudian */
+      pkGroupReopen(j); pkJobSave(); pkShow(); pkSync();
+    };
     gs('jobApproval', [meNip(), [j.id]]).then(function (r) {          /* sudah disetujui Group Head / Section Head? maka dikunci */
       var a = r && r.ap && r.ap[j.id];
       if (a) { apApply(j, a, false); toast('Pekerjaan ini sudah disetujui ' + a.by + ', tidak bisa dilanjutkan lagi.', true); } else lanjut();
@@ -5022,14 +5192,14 @@ var ACT = {
     if (s.s === 'tunda' && s.mine && s.job && s.job.brk && !s.job.gl && S.pk.bg.indexOf(s.job) >= 0) { pkSwitch(s.job.id); return; }          // tunda istirahat milik sendiri: dilanjutkan dari halaman pekerjaan (jam meneruskan)
     if (s.s === 'tunda') {                       // meneruskan pekerjaan tunda: sesi baru, jam mulai dari nol
       if (pkBlock(S.pk.job, kd)) return;
-      if (!S.mi[s.n]) { ckPick(kd, r); return; }
+      if (!S.mi[s.n] && !ckPoolLain(kd, s.n)) { ckPick(kd, r); return; }
       ckStart(kd, r, s.n, s.mine ? s.job.id : s.pid, { nm: s.who, m: s.mine ? Math.round((s.job.e - s.job.s) / 60000) : null });
       return;
     }
     if (s.mine) { if (S.pk.job === s.job) go('jobpk'); else if (s.job && !s.job.gl && S.pk.bg.indexOf(s.job) >= 0) pkSwitch(s.job.id); return; }
     if (s.s !== 'new') { toast('Laporan ini ' + (s.s === 'done' ? 'sudah selesai dikerjakan' : 'sedang dikerjakan') + ' oleh ' + s.who, true); ckFetch(kd, S[kd].d, true); return; }
     if (pkBlock(S.pk.job, kd)) return;
-    if (!S.mi[s.n]) { ckPick(kd, r); return; }
+    if (!S.mi[s.n] && !ckPoolLain(kd, s.n)) { ckPick(kd, r); return; }
     ckStart(kd, r, s.n);
   },
   cktake: function (a, b) {
@@ -5114,6 +5284,13 @@ var ACT = {
   lstoday: function () { S.ls.d = todayIso(); renderShell(); lsFetch(lsYm()); },
   lsmon: function (a) { var L = S.ls, n = ymAdd(L.rm, +a); if (n > todayIso().slice(0, 7)) return; L.rm = n; renderShell(); lsFetch(n); },
   lsjenis: function (a) { S.ls.jenis = a; renderShell(); },
+  rdmode: function (a) {
+    var R = S.rd; if (R.mode === a) return; R.mode = a;
+    if (a === 'bulan') R.rm = R.d.slice(0, 7); else if (R.rm !== R.d.slice(0, 7)) R.d = R.rm === todayIso().slice(0, 7) ? todayIso() : R.rm + '-01';
+    renderShell(); rdFetch(rdYm());
+  },
+  rdday: function (a) { var R = S.rd, nd = isoAdd(R.d, +a); if (nd > todayIso()) return; R.d = nd; renderShell(); rdFetch(rdYm()); },
+  rdmon: function (a) { var R = S.rd, n = ymAdd(R.rm, +a); if (n > todayIso().slice(0, 7)) return; R.rm = n; renderShell(); rdFetch(n); },
   lsdl: function () {
     var L = S.ls, sc = lsScope(), rows = sc ? lsSort(lsFilter(sc)) : []; if (!rows.length) return;
     var p = isoParts(L.d), nm = L.mode === 'bulan' ? ymLabel(L.rm) : iso2(p.d) + '-' + iso2(p.m) + '-' + p.y;
@@ -5283,6 +5460,11 @@ document.addEventListener('change', function (e) {
   if (e.target.id === 'rs_day') {
     var rv = e.target.value, rt = todayIso();
     if (/^\d{4}-\d{2}-\d{2}$/.test(rv)) { if (rv > rt) rv = rt; S.rs.day = rv === rt ? '' : rv; if (S.view === 'rsv') rerender(); }
+    return;
+  }
+  if (e.target.id === 'rd_d') {
+    var rv = e.target.value, rt = todayIso();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(rv)) { if (rv > rt) rv = rt; S.rd.d = rv; renderShell(); rdFetch(rv.slice(0, 7)); }
     return;
   }
   if (e.target.id === 'ls_d') {
