@@ -210,7 +210,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-04 10:22';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-04 12:13';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -3707,12 +3707,48 @@ function rdTable(rows) {
   });
   return '<div class="rd-w"><table class="rd-tbl"><thead><tr><th>No</th><th>Jenis laporan</th><th>Nomor mobil</th><th>Isi keluhan</th><th>Service sebelumnya</th><th>Mekanik sebelumnya</th><th>Keterangan</th><th>Mekanik yang kerjakan</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
 }
+/* ---- CK mekanik Teknik: akumulasi sebulan ----
+   Mekanik = user Pengaturan berbagian Teknik (server: tk). Satu CK dihitung ke "Mekanik sebelumnya" (mekanik yang mengerjakan service terakhir mobil itu) dari tiap laporan Redo Job berjenis CK
+   (Kerusakan lain ikut; Cek baik tidak). Harian: dari tanggal 1 sampai tanggal yang dipilih; Bulanan: satu bulan penuh. Mekanik tanpa CK = bagus. */
+function rdNama(s) { return String(s || '').replace(/(^|\s)([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); }); }
+function rdMkData() {
+  var R = S.rd, D = R.rows[rdYm()]; if (!D || !D.tk || !D.tk.length) return null;
+  var cut = R.mode === 'bulan' ? '9999-99-99' : R.d, cnt = D.tk.map(function () { return 0; }), lain = {}, nol = 0;
+  D.rows.forEach(function (r) {
+    if (r.jn !== 'CK' || r.d > cut) return;
+    if (r.mi >= 0 && r.mi < cnt.length) cnt[r.mi]++;
+    else if (r.ms) lain[r.ms] = (lain[r.ms] || 0) + 1;
+    else nol++;
+  });
+  return { tk: D.tk, cnt: cnt, lain: lain, nol: nol, err: D.e || '' };
+}
+function rdMkRange() {
+  var R = S.rd, p = isoParts(R.mode === 'bulan' ? R.rm + '-01' : R.d), bl = BULAN[p.m - 1] + ' ' + p.y;
+  return R.mode === 'bulan' ? bl : (+p.d === 1 ? '1 ' + bl : '1 – ' + (+p.d) + ' ' + bl);
+}
+function rdMk() {
+  var M = rdMkData(); if (!M) return '';
+  var head = '<div class="rdm-h">CK mekanik Teknik<small>Akumulasi ' + esc(rdMkRange()) + '</small></div>';
+  if (M.err) return '<div class="rdm">' + head + '<div class="rd-note">Mekanik sebelumnya belum terbaca dari data aplikasi, jadi jumlah CK belum bisa dihitung: ' + esc(M.err) + '</div></div>';
+  var ix = M.tk.map(function (m, i) { return i; }).sort(function (a, b) { return M.cnt[b] - M.cnt[a] || (M.tk[a].n.toLowerCase() < M.tk[b].n.toLowerCase() ? -1 : 1); });
+  var mx = Math.max.apply(null, M.cnt.concat([5])), tot = 0, tr = '';
+  ix.forEach(function (i) {
+    var m = M.tk[i], c = M.cnt[i]; tot += c;
+    tr += '<tr><td class="nm">' + esc(rdNama(m.n)) + '</td><td>' + esc(rdNama(m.bg) || '-') + '</td><td>' + esc(m.jb || '-') + '</td><td class="n">' + c + '</td><td class="g">' +
+      (c ? '<div class="rdm-bar" role="img" aria-label="' + c + ' CK"><i style="width:' + Math.max(4, Math.round(c * 100 / mx)) + '%"></i></div>' : '<span class="rdm-ok">Bagus</span>') + '</td></tr>';
+  });
+  var lain = Object.keys(M.lain).map(function (k) { return esc(k) + ' (' + M.lain[k] + ')'; }), fn = [];
+  if (lain.length) fn.push('Mekanik sebelumnya di luar daftar Teknik (tidak dihitung): ' + lain.join(', ') + '.');
+  if (M.nol) fn.push(M.nol + ' laporan CK tanpa data mekanik sebelumnya (tidak dihitung).');
+  return '<div class="rdm">' + head + '<div class="rd-w"><table class="rd-tbl rdm-tbl"><thead><tr><th>Nama</th><th>Bagian</th><th>Jabatan</th><th class="n">Jumlah CK</th><th>Grafik</th></tr></thead><tbody>' + tr + '</tbody></table></div>' +
+    '<div class="rdm-fn">Total ' + tot + ' CK. Dihitung dari laporan di atas yang berjenis CK (Kerusakan lain ikut, Cek baik tidak), atas nama Mekanik sebelumnya.' + (fn.length ? ' ' + fn.join(' ') : '') + '</div></div>';
+}
 function rdBody() {
   var R = S.rd, sc = rdScope();
   if (!sc) return R.err ? '<div class="empty">Gagal memuat Laporan Redo Job.<br><small>' + esc(R.err) + '</small><br><small>Pastikan Code.gs terbaru sudah dipasang di Apps Script (fungsi getRedoJob).</small></div>' : '<div class="empty">Memuat laporan...</div>';
-  if (!sc.length) return '<div class="empty">Belum ada laporan Redo Job ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '.<br><small>Muncul setelah Group Head / Section Head meng-ACC pekerjaan CK. Keluhan Ban, tambal ban, IOT, lampu, dan Argo tidak termasuk.</small></div>';
+  if (!sc.length) return '<div class="empty">Belum ada laporan Redo Job ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '.<br><small>Muncul setelah Group Head / Section Head meng-ACC pekerjaan CK. Keluhan Ban, tambal ban, IOT, lampu, dan Argo tidak termasuk.</small></div>' + rdMk();
   var er = (R.rows[rdYm()] || {}).e;
-  return (er ? '<div class="rd-note">Service sebelumnya belum terbaca dari data aplikasi: ' + esc(er) + '</div>' : '') + rdTable(sc) + '<div class="rd-hint">Geser tabel ke kanan untuk melihat kolom lainnya.</div>';
+  return (er ? '<div class="rd-note">Service sebelumnya belum terbaca dari data aplikasi: ' + esc(er) + '</div>' : '') + rdTable(sc) + '<div class="rd-hint">Geser tabel ke kanan untuk melihat kolom lainnya.</div>' + rdMk();
 }
 function vRedo() {
   var head = '<div class="ls-head"><div class="ls-hi">' + ic('redo') + '</div><div><h3>Laporan Redo Job</h3><p>Laporan CK yang sudah di-ACC GH / SH</p></div></div>';
