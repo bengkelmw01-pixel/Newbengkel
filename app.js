@@ -207,14 +207,14 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-04 06:57';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-04 08:32';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
 function foot() {
   return '<p class="foot">Sinkron otomatis dari Google Sheet' + (S.data && S.data.src ? ' (' + esc(S.data.src) + ')' : '') + ' &middot; terakhir dicek <span id="lastchk">' + hm(S.lastLoad || Date.now()) + '</span> &middot; <a data-act="sync">Sinkron sekarang</a><br><small class="fver">' + verHtml() + '</small></p>';
 }
-function nchip(n) { return '<span class="nchip">' + ic('car', 'sm') + esc(n) + '</span>'; }
+function nchip(n) { return '<span class="nchip">' + ic(n === 'RO' ? 'wrench' : 'car', 'sm') + esc(n) + '</span>'; }
 
 var LJ_IMG = 'data:image/png;base64,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';
 
@@ -266,10 +266,21 @@ function rerender() {
   // data diperbarui di latar belakang: pertahankan isi kolom cari/form, kursor, dan posisi gulir
   var q = $('#q'); if (q) S.q[S.view] = q.value;
   var ae = document.activeElement, fid = ae && /^(q|pk_n|cs_n|cs_m\d+|pk_t|lc_n|ls_q|rs_q|rs_ket|ck_q|ck_pq|tb_q|tb_pq|pem_q|pem_pq|las_q|las_pq|lg_n|fk_.+)$/.test(ae.id || '') ? ae.id : '';
-  var pos = fid ? ae.selectionStart : 0, y = window.pageYOffset;
+  var exi = ae && ae.classList && ae.classList.contains('rs-exi') ? Array.prototype.indexOf.call(document.querySelectorAll('.rs-exi'), ae) : -1;          /* isian barang manual Reservasi (tanpa id): ingat urutannya */
+  var pos = fid || exi >= 0 ? ae.selectionStart : 0, y = window.pageYOffset;
+  rsFormKeep();
   renderShell();
   window.scrollTo(0, y);
   if (fid) { var f2 = $('#' + fid); if (f2) { f2.focus(); try { f2.setSelectionRange(pos, pos); } catch (e) {} } }
+  else if (exi >= 0) { var f3 = document.querySelectorAll('.rs-exi')[exi]; if (f3) { f3.focus(); try { f3.setSelectionRange(pos, pos); } catch (e) {} } }
+}
+/* form Reservasi: isian yang sedang diketik (barang manual, keterangan, nomor S) tidak hilang saat layar digambar ulang oleh pembaruan data di latar belakang */
+function rsFormKeep() {
+  var f = S.rs && S.rs.f; if (S.view !== 'rsvform' || !f || !$('#rs_ex')) return;
+  f.ex = rsExRead();
+  var k = $('#rs_ket'); if (k) f.ket = k.value;
+  var sv = $('#rs_sv'); if (sv) f.sv = sv.value;
+  var er = $('#rs_err'); if (er) f.err = er.textContent;          /* pesan galat tidak hilang saat layar digambar ulang */
 }
 
 function kmLab(l) { return (l < 0 ? '- ' + fmt(Math.abs(l)) : fmt(l)) + ' KM'; }
@@ -1929,10 +1940,15 @@ var CSJ = ['Perawatan mojul', 'Persiapan unit scrap', 'Tambal ban', 'Ganti lampu
 function izinBebasCk(kl) { return /(^|[^a-z])(ban|iy?ot)(nya|2)?(?![a-z])|bocor|tambal/i.test(String(kl || '')); }
 function izinBebas(p) { return /^(tambah|tambal) ban$/i.test(String(p || '').trim()); }          /* CS Tambal ban (ejaan lama Tambah ban tetap dikenali): PKL langsung mulai, tanpa ACC */
 function csModul() { return S.cs.p === CSJ[0]; }
+/* Rebuild Spare part (RO): tanpa nomor mobil (dicatat sebagai 'RO'), hanya Keterangan + foto part yang di-rebuild (minimal 1, maksimal 3) */
+var CS_RO = 'Rebuild Spare part (RO)', CS_RO_NO = 'RO';
+function csRo() { return S.cs.p === CS_RO; }
+function csRoJ(j) { return !!j && j.j === 'cs' && !!j.cs && j.cs.p === CS_RO; }
 function csKey(x) { return String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 /* isian Nomor Mobil / Nomor Plat -> mobil di Master kendaraan: { n, pl, jn } atau null */
 function csFind() {
   var C = S.cs, M = (S.data && S.data.master) || [], raw = String(C.n || '').trim(), i, n, m;
+  if (C.p && csRo()) return { n: CS_RO_NO, pl: '', jn: '', fr: 1, ro: 1 };          /* Rebuild Spare part (RO): tanpa nomor mobil */
   if (!raw || !C.p) return null;
   if (csModul()) {
     var k = csKey(raw); for (i = 0; i < M.length; i++) if (M[i].p && csKey(M[i].p) === k) return { n: M[i].n, pl: M[i].p, jn: M[i].j || '' };
@@ -1943,7 +1959,7 @@ function csFind() {
 }
 function csResHtml() {
   var raw = String(S.cs.n || '').trim(), f = csFind();
-  if (!raw) return '';
+  if (csRo() || !raw) return '';
   if (f && f.fr) return '<div class="pkok">' + ic('check', 'sm') + ' Plat ' + esc(f.pl) + ' &middot; bebas (mojul tidak perlu ada di Master kendaraan)</div>';
   if (f) return '<div class="pkok">' + ic('check', 'sm') + ' #' + esc(f.n) + (f.jn ? ' &middot; ' + esc(f.jn) : '') + (f.pl ? ' &middot; Plat ' + esc(f.pl) : '') + '</div>';
   if (csModul()) return '<div class="empty">Nomor plat minimal 3 huruf / angka.</div>';
@@ -1984,6 +2000,10 @@ function csGoOk() { return !!csFind() && !csCars().bad; }
 function csRestHtml() {
   var C = S.cs, M = (S.data && S.data.master) || [], mod = csModul();
   if (!C.p) return '<div class="pkhint">Pilih pekerjaan dulu. Nama petugas dan jabatan terisi otomatis, lalu isi nomor mobil.</div>';
+  if (csRo()) return '<dl class="kv cs-me"><dt>Nama petugas</dt><dd>' + esc(meNama()) + ' <small>(otomatis)</small></dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + ' <small>(otomatis)</small></dd></dl>' +
+    '<div class="pkok">' + ic('check', 'sm') + ' Rebuild Spare part tidak memakai nomor mobil. Isi Keterangan, lalu masukkan foto part yang di-rebuild (minimal 1, maksimal 3).</div>' +
+    '<button class="btn full pkbtn" id="cs_go" data-act="csgo">' + ic('wrench', 'sm') + ' Kerjakan</button>' +
+    '<div class="pkhint">Setelah menekan Kerjakan, Anda ditanya dulu apakah akan mengerjakan pekerjaan ini. Jika ya, waktu mulai berjalan.</div>';
   var dl = M.map(function (m) { return mod ? (m.p ? '<option value="' + esc(m.p) + '">' + esc(m.n + ' - ' + (m.j || '')) + '</option>' : '') : '<option value="' + esc(m.n) + '">' + esc((m.p || '') + ' - ' + (m.j || '')) + '</option>'; }).join('');
   return '<dl class="kv cs-me"><dt>Nama petugas</dt><dd>' + esc(meNama()) + ' <small>(otomatis)</small></dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + ' <small>(otomatis)</small></dd></dl>' +
     '<label for="cs_n">' + (mod ? 'Nomor Plat' : 'Nomor Mobil') + '<input id="cs_n" list="dl_cs" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="' + (mod ? 'Ketik / cari nomor plat, contoh: B 1234 XYZ' : 'Isi manual, contoh: MWD379') + '" value="' + esc(C.n) + '"></label><datalist id="dl_cs">' + dl + '</datalist>' +
@@ -2007,8 +2027,9 @@ function vCs() {
 /* teks yang dikirim ke kolom Pekerjaan Tambahan di Laporan Jam Mekanik: jenis pekerjaan (+ plat) dan Keterangan */
 function csTxt(x) { var c = x.cs || {}; return (c.p || 'Corrective Supporting') + (c.pl ? ' (Plat ' + c.pl + ')' : '') + ': ' + (x.t || ''); }
 function csKet(j) { return !!String(j.t || '').replace(/\s+/g, ' ').trim(); }
-function csDoneUi(j) { if (csModulJ(j)) { phDoneUi(j); return; } var b = $('#pk_done'), h = $('#pk_csh'), ok = csKet(j); if (b) b.disabled = !ok; if (h) h.style.display = ok ? 'none' : ''; }
-function csModulJ(j) { return !!j && j.j === 'cs' && !!j.cs && j.cs.p === CSJ[0]; }          /* Perawatan mojul: foto selesai minimal 1, maksimal 5 */
+function csDoneUi(j) { if (csFotoJ(j)) { phDoneUi(j); return; } var b = $('#pk_done'), h = $('#pk_csh'), ok = csKet(j); if (b) b.disabled = !ok; if (h) h.style.display = ok ? 'none' : ''; }
+function csModulJ(j) { return !!j && j.j === 'cs' && !!j.cs && j.cs.p === CSJ[0]; }
+function csFotoJ(j) { return csModulJ(j) || csRoJ(j); }          /* Corrective Supporting yang memakai Foto Selesai: Perawatan mojul (1-5 foto) dan Rebuild Spare part RO (1-3 foto) */          /* Perawatan mojul: foto selesai minimal 1, maksimal 5 */
 function csBegin(f, ex) {
   var cur = S.pk.job;
   if (pkBlock(cur, 'cs')) return;
@@ -2024,7 +2045,7 @@ function csBegin(f, ex) {
   pkJobSave(); go('jobpk'); pkSync();
 }
 function pkShowCs(el, job) {
-  var cs = job.cs || {}, m = S.mi[job.n] || {}, done = !!job.e, mod = csModulJ(job);
+  var cs = job.cs || {}, m = S.mi[job.n] || {}, done = !!job.e, mod = csFotoJ(job), ro = csRoJ(job);
   var rows = '<dt>Pekerjaan</dt><dd><b>' + esc(cs.p || '-') + '</b></dd><dt>Nama petugas</dt><dd>' + esc(job.un || meNama()) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' +
     (cs.fr ? '' : '<dt>No Mobil</dt><dd>#' + esc(job.n) + (m.j ? ' &middot; ' + esc(m.j) : '') + '</dd>') + (cs.pl ? '<dt>Nomor Plat</dt><dd>' + esc(cs.pl) + '</dd>' : '') +
     (job.gm && job.gm.length ? '<dt>Mobil lain</dt><dd>' + job.gm.map(function (g) { return '#' + esc(g.n); }).join(', ') + '<br><small class="mut">Dikerjakan bersamaan, selesai bersamaan (' + (1 + job.gm.length) + ' mobil)</small></dd>' : '') +
@@ -2033,11 +2054,11 @@ function pkShowCs(el, job) {
   if (job.cf) body = pkCfHtml(job);
   else if (done) body = '<div class="pkx ro"><span>Keterangan</span><p>' + esc(job.t || '-') + '</p></div>' + rsvBlock(job) + ph + '<div class="pkfin">' + ic('check') + ' Pengerjaan selesai</div><div id="pk_app">' + pkAppHtml(job) + '</div>' +
     '<button class="btn full pkbtn" data-act="pknew">' + ic('plus') + ' Pekerjaan Baru</button>' + (job.ap ? '' : '<button class="btn ghost full pkbtn" data-act="pkresume">Salah tekan? Lanjutkan lagi</button>');
-  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="Isi manual, contoh: Mojul diganti dan sudah dites normal">' + esc(job.t || '') + '</textarea></div>' + rsvBlock(job) + ph +
+  else body = '<div class="pkx"><label for="pk_t">Keterangan <em>wajib diisi</em></label><textarea id="pk_t" rows="3" maxlength="200" placeholder="' + (ro ? 'Isi manual, contoh: Kaliper rem depan di-rebuild, seal diganti' : 'Isi manual, contoh: Mojul diganti dan sudah dites normal') + '">' + esc(job.t || '') + '</textarea></div>' + rsvBlock(job) + ph +
     '<button class="btn full pkbtn pkdone" id="pk_done" data-act="pkdone"' + ((mod ? phGo(job) : csKet(job)) ? '' : ' disabled') + '>' + ic('check') + ' Pengerjaan Selesai</button>' +
     (mod ? '<div class="pkfs-hint" id="pk_phh"' + (phGo(job) ? ' style="display:none"' : '') + '>' + phHint(job) + '</div>'
       : '<div class="pkfs-hint" id="pk_csh"' + (csKet(job) ? ' style="display:none"' : '') + '>Isi Keterangan dulu (wajib). Tombol Pengerjaan Selesai aktif setelah Keterangan terisi.</div>');
-  el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">' + (cs.fr ? esc(cs.pl || job.n) : '#' + esc(job.n)) + '</b><span class="pill pk-cs">Corrective Supporting</span></div><dl class="kv">' + rows + '</dl>' + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
+  el.innerHTML = '<div class="pkcard"><div class="pkhead"><b class="no">' + (ro ? 'RO' : cs.fr ? esc(cs.pl || job.n) : '#' + esc(job.n)) + '</b><span class="pill pk-cs">Corrective Supporting</span></div><dl class="kv">' + rows + '</dl>' + body + '<div id="pksync">' + pkSyncHtml(job) + '</div></div>';
 }
 /* daftar mobil yang jatuh tempo service (sama dengan menu Service Teknik / Keindahan) + tombol Kerjakan */
 function pkSegUi() {
@@ -2171,10 +2192,10 @@ function pkCfHtml(j) {
     '<button class="btn full pkbtn" data-act="pkcf">Tutup</button>';
 }
 function pkAppHtml(j) {
-  var ph = phOn(j), fk = fkOn(j), nomo = fk ? (j.fs ? '<span class="pkgood">' + ic('check', 'sm') + ' Form Fokus tersimpan</span>' : '<span class="pkbad">' + ic('warn', 'sm') + ' Form Fokus belum disimpan</span>') : !ph ? '' : (phOk(j) ? '<span class="pkgood">' + ic('check', 'sm') + ' ' + phLbC(j) + ' lengkap (' + (j.ck || csModulJ(j) ? phN(j) : phSlots(j).length) + ' foto)</span>' : '<span class="pkbad">' + ic('warn', 'sm') + ' ' + phLbC(j) + ' ' + phN(j) + '/' + phSlots(j).length + (pkPPending(j) ? ' &middot; masih dikirim' : '') + '</span>'), ns = nomo ? '<small>' + nomo + '</small>' : '';
+  var ph = phOn(j), fk = fkOn(j), nomo = fk ? (j.fs ? '<span class="pkgood">' + ic('check', 'sm') + ' Form Fokus tersimpan</span>' : '<span class="pkbad">' + ic('warn', 'sm') + ' Form Fokus belum disimpan</span>') : !ph ? '' : (phOk(j) ? '<span class="pkgood">' + ic('check', 'sm') + ' ' + phLbC(j) + ' lengkap (' + (j.ck || csFotoJ(j) ? phN(j) : phSlots(j).length) + ' foto)</span>' : '<span class="pkbad">' + ic('warn', 'sm') + ' ' + phLbC(j) + ' ' + phN(j) + '/' + phSlots(j).length + (pkPPending(j) ? ' &middot; masih dikirim' : '') + '</span>'), ns = nomo ? '<small>' + nomo + '</small>' : '';
   if (j.ap) return '<div class="pkapp ok">' + ic('shield') + '<div><b>Disetujui</b><small>' + esc(j.ap.by) + ' &middot; ' + hm(j.ap.at) + ' &middot; ' + pkDmy(j.ap.at) + '</small>' + ns + '</div></div>';
   /* mekanik tidak punya tombol approval: hanya menunggu Group Head / Section Head */
-  var need = fk && !j.fs ? 'Isi dan simpan Form Fokus dulu agar bisa disetujui.' : ph && !phOk(j) ? (j.ck || csModulJ(j) ? 'Masukkan minimal ' + phMin(j) + ' ' + phLb(j) + ' dulu agar bisa disetujui.' : 'Lengkapi ' + PHS.length + ' ' + phLb(j) + ' dulu agar bisa disetujui.') : '';
+  var need = fk && !j.fs ? 'Isi dan simpan Form Fokus dulu agar bisa disetujui.' : ph && !phOk(j) ? (j.ck || csFotoJ(j) ? 'Masukkan minimal ' + phMin(j) + ' ' + phLb(j) + ' dulu agar bisa disetujui.' : 'Lengkapi ' + PHS.length + ' ' + phLb(j) + ' dulu agar bisa disetujui.') : '';
   return '<div class="pkapp wait">' + ic('shield') + '<div><b>Menunggu approval</b><small>Waktu sudah berhenti. ' + (need || 'Pekerjaan ini menunggu persetujuan Group Head / Section Head.') + '</small>' + ns + '</div></div>';
 }
 /* di bawah / di atas kartu pekerjaan: daftar pekerjaan lain yang berjalan dan tombol pekerjaan baru (petugas Cat) */
@@ -2234,17 +2255,17 @@ var PHS = [['id', 'Interior Depan'], ['ib', 'Interior Belakang'], ['ed', 'Ekster
 var PHL = [['id', 'Foto 1'], ['ib', 'Foto 2'], ['ed', 'Foto 3']];
 /* Perawatan mojul (Corrective Supporting): Foto Selesai minimal 1, maksimal 5 (lima kolom foto pertama di server) */
 var PHC = [['id', 'Foto 1'], ['ib', 'Foto 2'], ['ed', 'Foto 3'], ['eb', 'Foto 4'], ['ek', 'Foto 5']];
-function phSlots(j) { return csModulJ(j) ? PHC : (j && j.ck ? PHL : PHS); }
-function phMin(j) { return csModulJ(j) || (j && j.ck) ? 1 : PHS.length; }
+function phSlots(j) { return csRoJ(j) ? PHL : csModulJ(j) ? PHC : (j && j.ck ? PHL : PHS); }
+function phMin(j) { return csFotoJ(j) || (j && j.ck) ? 1 : PHS.length; }
 var PHM = {};                       /* data foto di memori: kunci "idPengerjaan:kode" */
-function phOn(j) { return !!j && (csModulJ(j) || (j.ck ? kdOf(j) === 'las' : j.j === 'ki')); }          /* pengerjaan yang memakai 6 foto: Service Keindahan (Foto Kendaraan) dan Las (Foto Selesai Ketok). Service Teknik memakai Form Fokus */
+function phOn(j) { return !!j && (csFotoJ(j) || (j.ck ? kdOf(j) === 'las' : j.j === 'ki')); }          /* pengerjaan yang memakai 6 foto: Service Keindahan (Foto Kendaraan) dan Las (Foto Selesai Ketok). Service Teknik memakai Form Fokus */
 function fkGo(j) { return !fkOn(j) || !!j.fs; }          /* Service Teknik: Pengerjaan Selesai baru boleh ditekan setelah Form Fokus tersimpan (wajib) */
 function fkHint(j) { return j.fcl && !j.fs ? 'Form Fokus mekanik sebelumnya sedang dimuat. Tombol Pengerjaan Selesai aktif sesudahnya.' : 'Form Fokus wajib diisi dan disimpan dulu. Tombol Pengerjaan Selesai aktif setelah Form Fokus tersimpan.'; }
 function fkOn(j) { return !!j && !j.ck && j.j !== 'ki' && j.j !== 'cs' && j.j !== 'bm'; }          /* Service Teknik: Form Fokus (Form Pengukuran Servis), tanpa foto kendaraan */
-function phLb(j) { return csModulJ(j) ? 'foto perawatan mojul' : j && j.ck ? 'foto selesai ketok' : 'foto kendaraan'; }
-function phLbC(j) { return csModulJ(j) ? 'Foto perawatan mojul' : j && j.ck ? 'Foto selesai ketok' : 'Foto kendaraan'; }
-function phNm(j) { return csModulJ(j) ? 'Foto Perawatan Mojul' : j && j.ck ? 'Foto Selesai Ketok' : 'Foto Kendaraan'; }
-function phKet(j) { return csModulJ(j) ? csKet(j) : (kdOf(j) !== 'las' || !!String(j.t || '').replace(/\s+/g, ' ').trim()); }          /* Las: Keterangan wajib diisi manual */
+function phLb(j) { return csRoJ(j) ? 'foto part rebuild' : csModulJ(j) ? 'foto perawatan mojul' : j && j.ck ? 'foto selesai ketok' : 'foto kendaraan'; }
+function phLbC(j) { return csRoJ(j) ? 'Foto part rebuild' : csModulJ(j) ? 'Foto perawatan mojul' : j && j.ck ? 'Foto selesai ketok' : 'Foto kendaraan'; }
+function phNm(j) { return csRoJ(j) ? 'Foto Part Rebuild' : csModulJ(j) ? 'Foto Perawatan Mojul' : j && j.ck ? 'Foto Selesai Ketok' : 'Foto Kendaraan'; }
+function phKet(j) { return csFotoJ(j) ? csKet(j) : (kdOf(j) !== 'las' || !!String(j.t || '').replace(/\s+/g, ' ').trim()); }          /* Las: Keterangan wajib diisi manual */
 function phLs(j, k) { return 'bka_ph:' + j.id + ':' + k; }
 function phGet(j, k) {
   var key = j.id + ':' + k; if (PHM[key]) return PHM[key];
@@ -2257,7 +2278,7 @@ function phPurge(j) { PHS.forEach(function (s) { phDrop(j, s[0]); }); }
 function phFilled(j) { var n = 0; if (j && j.ph) phSlots(j).forEach(function (s) { var o = j.ph[s[0]]; if (o && (o.p || o.y)) n++; }); return n; }      /* slot yang sudah berisi foto (terkirim atau menunggu kirim) */
 function phGo(j) { return phFilled(j) >= phMin(j) && phKet(j); }          /* syarat tombol Pengerjaan Selesai: foto cukup (Keindahan 6; Las minimal 1) + Keterangan untuk Las */
 function phHint(j) {
-  if (csModulJ(j)) { var q = []; if (phFilled(j) < phMin(j)) q.push('minimal ' + phMin(j) + ' foto dimasukkan (' + phFilled(j) + '/' + phSlots(j).length + ')'); if (!phKet(j)) q.push('Keterangan diisi'); return 'Tombol Pengerjaan Selesai aktif setelah ' + q.join(' dan ') + '.'; }
+  if (csFotoJ(j)) { var q = []; if (phFilled(j) < phMin(j)) q.push('minimal ' + phMin(j) + ' foto dimasukkan (' + phFilled(j) + '/' + phSlots(j).length + ')'); if (!phKet(j)) q.push('Keterangan diisi'); return 'Tombol Pengerjaan Selesai aktif setelah ' + q.join(' dan ') + '.'; }
   if (!j.ck) return 'Tombol Pengerjaan Selesai aktif setelah ' + PHS.length + ' foto kendaraan dimasukkan (' + phFilled(j) + '/' + PHS.length + ').';
   var p = []; if (phFilled(j) < phMin(j)) p.push('minimal ' + phMin(j) + ' foto selesai ketok dimasukkan (' + phFilled(j) + '/' + phSlots(j).length + ')'); if (!phKet(j)) p.push('Keterangan diisi');
   return 'Tombol Pengerjaan Selesai aktif setelah ' + p.join(' dan ') + '.';
@@ -2277,7 +2298,7 @@ function pkPhHtml(job) {
     return '<div class="pht' + cls + '" data-k="' + k + '"><div class="pht-t">' + esc(s[1]) + '</div><div class="pht-v">' + im + '</div><div class="pht-s">' + st + '</div>' + bt + '</div>';
   }).join('');
   return '<div class="pkph-h"><span>' + phNm(job) + '</span><em class="' + (n >= phMin(job) ? 'ok' : '') + '">' + n + '/' + sl.length + ' foto</em></div><div class="pkph-g">' + g + '</div>' +
-    (lock ? '' : '<div class="pkfs-hint">Foto JPG / PNG, bisa langsung dari kamera. ' + (job.ck || csModulJ(job) ? 'Wajib minimal ' + phMin(job) + ' foto, maksimal ' + sl.length + ' foto, sebelum approval pengawas.' : 'Wajib ' + sl.length + ' foto sebelum approval pengawas.') + '</div>');
+    (lock ? '' : '<div class="pkfs-hint">Foto JPG / PNG, bisa langsung dari kamera. ' + (job.ck || csFotoJ(job) ? 'Wajib minimal ' + phMin(job) + ' foto, maksimal ' + sl.length + ' foto, sebelum approval pengawas.' : 'Wajib ' + sl.length + ' foto sebelum approval pengawas.') + '</div>');
 }
 function phDoneUi(j) {          /* tombol Pengerjaan Selesai + petunjuknya mengikuti isian (foto, dan Keterangan untuk Las) */
   var bd = $('#pk_done'), hh = $('#pk_phh'), full = phGo(j);
@@ -2628,16 +2649,16 @@ function ckStats(kd) {
   var chip = function (k, t, n) { return '<button class="ls-chip' + (C.st === k ? ' on' : '') + '" data-act="ckst" data-a="' + k + '" data-b="' + kd + '">' + t + ' <b>' + n + '</b></button>'; };
   return bar + pkBgHtml() + '<div class="ls-chips">' + chip('all', 'Semua', o.all) + chip('new', 'Belum', o['new']) + chip('run', 'Dikerjakan', o.run) + chip('tunda', 'Tunda', o.tunda) + chip('done', 'Selesai', o.done) + (kd === 'tb' ? chip('las', 'Di Las', o.las) : '') + '</div>';
 }
-/* ---------- Tabrak Cat: pilihan "No Registrasi" seperti Input Bengkel di aplikasi klaim ----------
-   Isinya semua No Registrasi yang belum ada foto selesainya (akan dikerjakan / tunda). Begitu Cat mengirim foto selesai, No Registrasi itu hilang dari pilihan.
+/* ---------- Tabrak Cat: pilihan "No Registrasi" SAMA dengan Input Bengkel di aplikasi klaim ----------
+   Isinya semua No Registrasi yang belum diinput di aplikasi klaim (Status di tab Bengkel masih kosong). Foto selesai dari Cat saja belum menghapusnya dari pilihan: jumlahnya harus sama dengan aplikasi klaim.
    Memilih satu No Registrasi membuka tanggal laporannya dan menampilkan kartu itu (tombol Kerjakan / Lanjutkan). */
 function tbRegVal(x) { return x.rg + '|' + x.d; }
 function tbRegHtml() {
   var T = S.tbreg, R = T.rows, cur = S.tb.reg, has = false, i;
   if (R) for (i = 0; i < R.length; i++) if (tbRegVal(R[i]) === cur) has = true;
   if (!has) cur = '';
-  var lab = R ? 'Semua No Registrasi (' + R.length + ' belum selesai)' : 'Memuat No Registrasi...';
-  return '<label for="tb_reg">No Registrasi <small>belum ada foto selesai &middot; akan dikerjakan / tunda</small></label>' +
+  var lab = R ? 'Semua No Registrasi (' + R.length + ' belum diinput di app klaim)' : 'Memuat No Registrasi...';
+  return '<label for="tb_reg">No Registrasi <small>sama dengan Input Bengkel di app klaim</small></label>' +
     '<select id="tb_reg"' + (R ? '' : ' disabled') + '><option value="">' + esc(lab) + '</option>' +
     (R || []).map(function (x) { var v = tbRegVal(x); return '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(x.rg + ' - ' + (x.nm || '-') + ' (' + (x.n || '-') + ')') + '</option>'; }).join('') + '</select>' +
     (T.err ? '<div class="tb-regerr">Gagal memuat daftar No Registrasi: ' + esc(T.err) + ' <a data-act="tbregref">Coba lagi</a></div>' : '');
@@ -2662,7 +2683,7 @@ function tbRegReset() { var C = S.tb; if (C.reg) { if (C.q === C.reg.split('|')[
 function tbRegPick(v) {
   var C = S.tb, p = v ? v.split('|') : [];
   C.reg = v || '';
-  if (v && p[1]) { C.d = p[1] > todayIso() ? todayIso() : p[1]; C.q = p[0]; C.st = 'all'; } else C.q = '';
+  if (v) { if (p[1]) C.d = p[1] > todayIso() ? todayIso() : p[1]; C.q = p[0]; C.st = 'all'; } else C.q = '';
   renderShell(); ckFetch('tb', C.d);
 }
 function vCk(kd) {
@@ -2722,7 +2743,7 @@ function askStart(o, fn) {
   S.pkgo = fn; S.pkgoO = o;
   var pk = isPkl() && !o.free;
   showModal('<div class="sh-head"><b>' + (o.td ? 'Lanjutkan Pekerjaan Tunda' : 'Mulai Pengerjaan') + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
-    '<div class="pkapsum"><b class="no">#' + esc(o.n) + '</b> <span class="pill pk-' + o.k + '">' + esc(o.t) + '</span>' +
+    '<div class="pkapsum"><b class="no">' + (o.k === 'cs' && o.n === CS_RO_NO ? 'RO' : '#' + esc(o.n)) + '</b> <span class="pill pk-' + o.k + '">' + esc(o.t) + '</span>' +
     '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(meNama()) + '</dd>' + (o.info || '') + '</dl></div>' +
     '<div class="pkq">' + (o.td ? 'Apakah Anda akan meneruskan pekerjaan tunda ini?' : (o.q || 'Apakah Anda akan mengerjakan armada ini?')) +
     '<small>' + (pk ? 'Anda perlu ACC dari Section Head / Group Head atau Devi dulu. Waktu mulai berjalan setelah disetujui.' : o.brk ? 'Jam kerja meneruskan yang tadi setelah menekan OK.' : o.td ? 'Jam kerja Anda mulai dari nol setelah menekan OK.' : 'Waktu mulai berjalan setelah Anda menekan OK.') + '</small></div>' +
@@ -3088,6 +3109,7 @@ var FK = [
   { k: 'r10', no: 10, t: 'Durasi Motor Fan',                  u: 'Detik',   std: '25 Detik (Maksimal)',     max: 25 }
 ];
 var FK_TIRE = [['dr', 'Depan R'], ['dl', 'Depan L'], ['br', 'Belakang R'], ['bl', 'Belakang L']];
+var FK_BAN_ORD = ['dr', 'dl', 'bl', 'br'];          /* urutan baris ban per mobil di tab BAN: Depan R, Depan L, Belakang L, Belakang R (tampilan form tetap Depan R, Depan L, Belakang R, Belakang L) */
 var FK_TWI = { t: 'TWI Ban', u: 'mm', std: '1,5 mm (Rata TWI)', min: 1.5 };
 var FK_RAD = { t: 'Tekanan Radiator', u: 'Kgf/cm2', std: '1,1 - 1,3 Kgf/cm2', min: 1.1, max: 1.3 };
 function fkBuildAll(items) {
@@ -3194,10 +3216,10 @@ function fkCard(k) {
   for (var i = 0; i < cs.length; i++) if ((cs[i].getAttribute('data-ks') || '').split(',').indexOf(k) >= 0) return cs[i];
   return null;
 }
-/* No. Emboss otomatis dari data ban (tab BAN di DATA_APLIKASI): urutan ban di sheet = Depan R, Depan L, Belakang R, Belakang L */
+/* No. Emboss otomatis dari data ban (tab BAN di DATA_APLIKASI): urutan ban tiap mobil di sheet = Depan R, Depan L, Belakang L, Belakang R (baris ke-3 Belakang L, baris terakhir Belakang R) */
 function fkEmb(j) {
   var km = (S.data && S.data.km) || {}, out = {}, list = (km.ban || []).filter(function (r) { return r[0] === j.n && String(r[1] || '').trim(); });
-  FK_TIRE.forEach(function (x, i) { if (list[i]) out['em_' + x[0]] = String(list[i][1]).replace(/\s+/g, ' ').trim(); });
+  FK_TIRE.forEach(function (x) { var r = list[FK_BAN_ORD.indexOf(x[0])]; if (r) out['em_' + x[0]] = String(r[1]).replace(/\s+/g, ' ').trim(); });
   return out;
 }
 function fkAutoFill(j) {
@@ -3874,7 +3896,7 @@ function apCard(it) {
     : !ok ? '<div class="ap-st bad">' + ic('warn', 'sm') + '<span>' + esc(it.rm) + '. Belum bisa disetujui, menunggu mekanik melengkapi.</span></div>'
     : '<div class="ap-st ok">' + ic('check', 'sm') + '<span>Siap disetujui</span></div>';
   var info = it.j === 'teknik' ? '<button class="btn ghost ap-bt" data-act="apinfo" data-a="' + esc(it.id) + '">' + ic('clip', 'sm') + ' Lihat Form Fokus</button>'
-    : (it.j === 'ki' || it.j === 'las' || apModul(it) || (it.j === 'tb' && it.fs && it.fs.length)) ? '<button class="btn ghost ap-bt" data-act="apinfo" data-a="' + esc(it.id) + '">' + ic('img', 'sm') + ' Lihat foto</button>' : '';
+    : (it.j === 'ki' || it.j === 'las' || apModul(it) || apRo(it) || (it.j === 'tb' && it.fs && it.fs.length)) ? '<button class="btn ghost ap-bt" data-act="apinfo" data-a="' + esc(it.id) + '">' + ic('img', 'sm') + ' Lihat foto</button>' : '';
   return '<div class="ap-card ' + (own ? 'own' : ok ? 'ready' : '') + '" data-id="' + esc(it.id) + '"><div class="ap-c1">' + nchip(it.n) + '<span class="pill pk-' + esc(it.j) + '">' + esc(APJ[it.j] || it.j) + '</span><span class="ap-ago">' + esc(apAgo(it)) + '</span></div>' +
     '<div class="ap-c2"><b>' + esc(it.nm) + '</b><span>' + p.d + '/' + p.m + ' &middot; ' + esc(it.s) + ' &ndash; ' + esc(it.e) + (it.m != null ? ' &middot; ' + esc(jamTxt(it.m)) : '') + '</span></div>' +
     '<div class="ap-tx"><small>' + lbl + '</small>' + esc(tx || '-') + (it.j === 'tb' && it.pem ? '<br><small style="margin:4px 0 0">Butuh PEM: Ya</small>' : '') + '</div>' + st +
@@ -3945,6 +3967,7 @@ function izDecide(id, ok) {
 }
 
 function apModul(it) { return !!it && it.j === 'cs' && /^Perawatan mojul/i.test(it.pt || ''); }
+function apRo(it) { return !!it && it.j === 'cs' && /^Rebuild Spare part \(RO\)/i.test(it.pt || ''); }
 function apPhGrid(slots, las) {
   return '<div class="lf-phs">' + (las === 'cs' ? PHC : las ? PHL : PHS).map(function (sl) {
     var f = slots.filter(function (x) { return x.k === sl[0]; })[0];
@@ -3987,6 +4010,51 @@ function rsItemsFor(kd, sv) {          /* barang otomatis untuk nomor S yang dik
 }
 function rsFormItems(f) { return f.ns ? rsItemsFor(f.kd, f.sv) : f.it; }
 function rsItemTxt(x) { return typeof x === 'string' ? x : x.t + (x.q ? ' ' + x.q : ''); }
+/* ---- Pilihan penggantian di form Reservasi Teknik (dan susulan Teknik): Kopling / Ban / Accu.
+   Datanya dari data aplikasi: Kopling = Total KM (tab KOPLING), Ban = KM per ban (tab BAN, posisi sama dengan Form Fokus), Accu = usia dari tanggal pasang (tab ACCU, sama dengan halaman Accu).
+   Kopling / Ban / Accu tidak boleh diketik manual di Tambahan barang. Server menyusun teks barangnya sendiri (Code.gs rsvPilih_). ---- */
+var RS_BAN = [['dl', 'Depan Kiri'], ['dr', 'Depan Kanan'], ['bl', 'Belakang Kiri'], ['br', 'Belakang Kanan']];          /* [kode, nama]; posisi di sheet BAN mengikuti FK_BAN_ORD (sama dengan No. Emboss di Form Fokus) */
+var RS_PL_RE = /^(Kopling|Accu|Ban (Depan|Belakang) (Kiri|Kanan)) \(/;
+var RS_KERAS = /\b(kopling|kopeling|clutch|clucth|clutc|ban|accu|acu|aki|akki|battery|baterai|batre|batere)\b/i;
+function rsPlNew() { return { kp: 0, ac: 0, bo: 0, bn: [] }; }
+function rsPlParse(au) {          /* barang tersimpan -> pilihan + sisa barang paket (saat reservasi dibuka lagi untuk diubah) */
+  var pl = rsPlNew(), rest = [];
+  (au || []).forEach(function (t) {
+    if (!RS_PL_RE.test(t)) { rest.push(t); return; }
+    if (t.indexOf('Kopling') === 0) pl.kp = 1; else if (t.indexOf('Accu') === 0) pl.ac = 1;
+    else RS_BAN.forEach(function (b) { if (t.indexOf('Ban ' + b[1] + ' (') === 0) { pl.bo = 1; pl.bn.push(b[0]); } });
+  });
+  return { pl: pl, rest: rest };
+}
+function rsPlKm(n) { var m = ((S.data && S.data.km) || {}).clutch || {}; return Object.prototype.hasOwnProperty.call(m, n) && m[n] != null ? 'KM ' + fmt(m[n]) : 'KM belum ada data'; }
+function rsPlAcc(n) { var a = (S.data && S.data.acc) || {}; return Object.prototype.hasOwnProperty.call(a, n) && a[n] ? 'Usia ' + ageTxt(ageMD(a[n], new Date())) : 'Usia belum ada data'; }
+function rsPlBan(n, k) {
+  var km = (S.data && S.data.km) || {}, ls = (km.ban || []).filter(function (r) { return r[0] === n && String(r[1] || '').trim(); }), i = 0, r;          /* sama dengan No. Emboss di Form Fokus */
+  i = FK_BAN_ORD.indexOf(k);
+  r = ls[i]; return r && r[2] != null ? 'KM ' + fmt(r[2]) : 'KM belum ada data';
+}
+function rsPlAny(pl) { return !!(pl && (pl.kp || pl.ac || (pl.bo && pl.bn.length))); }
+function rsPlSend(pl) { pl = pl || rsPlNew(); return { kp: pl.kp ? 1 : 0, ac: pl.ac ? 1 : 0, bo: pl.bo ? 1 : 0, bn: pl.bo ? pl.bn.slice() : [] }; }
+function rsPlOn(f) { return !!f && (!f.man || f.pk === 'Teknik'); }          /* form yang punya Pilihan penggantian: Reservasi Teknik dan susulan Teknik */
+function rsKerasFind(ex) { var i; for (i = 0; i < ex.length; i++) if (RS_KERAS.test(ex[i])) return ex[i]; return ''; }
+function rsPlHtml(f) {
+  var pl = f.pl || (f.pl = rsPlNew()), n = f.n;
+  function row(a, icn, lbl, on, info) {
+    return '<button type="button" class="rs-pgc' + (on ? ' on' : '') + '" data-act="rspl" data-a="' + a + '" aria-pressed="' + (on ? 'true' : 'false') + '"><span class="rs-ck">' + (on ? ic('check', 'sm') : '') + '</span>' + ic(icn, 'sm') +
+      '<b>' + lbl + '</b>' + (on && info ? '<em>' + esc(info) + '</em>' : '') + '</button>';
+  }
+  var h = row('kp', 'clutch', 'Kopling', pl.kp, rsPlKm(n)) + row('ac', 'battery', 'Accu', pl.ac, rsPlAcc(n)) + row('bo', 'tire', 'Ban', pl.bo, pl.bn.length ? '' : 'pilih posisi');
+  if (pl.bo) h += '<div class="rs-bpos">' + RS_BAN.map(function (b) {
+    var on = pl.bn.indexOf(b[0]) >= 0;
+    return '<button type="button" class="rs-bpc' + (on ? ' on' : '') + '" data-act="rsbn" data-a="' + b[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '"><b>' + b[1] + '</b>' + (on ? '<em>' + esc(rsPlBan(n, b[0])) + '</em>' : '') + '</button>';
+  }).join('') + '</div>';
+  return h;
+}
+function rsPlBlock(f) {
+  return '<h3 class="rs-h">Pilihan penggantian <em>opsional</em></h3><div class="rs-pg" id="rs_pg">' + rsPlHtml(f) + '</div>' +
+    '<div class="rs-pgh">Pilih bila perlu diganti. KM dan usia diambil dari data aplikasi. Kopling, Ban, dan Accu hanya lewat pilihan ini, tidak bisa diketik manual di bawah.</div>';
+}
+function rsPlUi() { var el = $('#rs_pg'), f = S.rs.f, er = $('#rs_err'); if (el && f) el.innerHTML = rsPlHtml(f); if (er) er.textContent = ''; }
 function rsMine(p) { return !!p.bn && String(p.bn).toLowerCase() === String(meNip()).toLowerCase(); }
 /* ---- Reservasi MANUAL / SUSULAN (selain paket otomatis Service Teknik): barang diketik sendiri ----
    Manual  = tombol Reservasi di halaman pekerjaan CK / Keindahan / Cat / CS / Las / PEM -> Draft muncul di "Perlu diisi" pembuatnya.
@@ -3995,7 +4063,7 @@ function rsMy(d) { return isAdmin() || rsMine(d) || (!!d.mk && !!(S.me && S.me.n
 function rsMek() { return !!(S.me && S.me.jobs && Object.keys(S.me.jobs).length); }          /* akun yang mengerjakan pekerjaan (mekanik / Admin) */
 function rsLbl(d) { return d.rj ? (d.rj === 'Susulan' ? 'Susulan' : 'Manual') + ' \u00b7 ' + (d.pk || '') + (d.rj === 'Susulan' && d.sv ? ' ' + d.sv : '') : 'Service ' + d.sv; }
 function rsPill(d) { return d.rj ? '<span class="pill pk-rsm">' + esc(rsLbl(d)) + '</span>' : '<span class="pill pk-teknik">Service ' + esc(d.sv) + '</span>'; }
-function rsFormMan(d) { return { man: 1, id: d.id, rj: d.rj, pk: d.pk, n: d.n, sv: d.sv || '', jn: d.jn, mk: d.mk, ket: d.ket || '', ex: (d.ex || []).slice() }; }
+function rsFormMan(d) { return { man: 1, id: d.id, rj: d.rj, pk: d.pk, n: d.n, sv: d.sv || '', jn: d.jn, mk: d.mk, ket: d.ket || '', ex: (d.ex || []).slice(), pl: rsPlParse(d.au).pl }; }
 function rsvKind(j) { var k = j ? (j.ck ? kdOf(j) : j.j) : ''; return ['ki', 'ck', 'tb', 'pem', 'las', 'cs'].indexOf(k) >= 0 ? k : ''; }
 function rsvInner(job) {
   return job.rsv ? '<div class="rsvb-ok">' + ic('check', 'sm') + '<span>Anda sudah bisa reservasi mobil ini di menu Reservasi.</span></div><button class="btn ghost full pkbtn" data-act="rsvgo">' + ic('cal', 'sm') + ' Buka menu Reservasi</button>'
@@ -4026,6 +4094,50 @@ function rsCount() {
   if (rsOps()) rsCards().forEach(function (d) { if (rsNeed(d)) ids[d.id] = 1; });
   return (rsTeknik() ? R.cand.filter(function (c) { return !c.man && !c.tdk; }).length : 0) + R.cand.filter(function (c) { return c.man && rsMine(c); }).length + Object.keys(ids).length;
 }
+/* ---- Bunyi pemberitahuan ASGH / Gudang: reservasi baru masuk -> bunyi "ting" 4,5 detik (dibuat dengan Web Audio, tanpa file suara).
+   Browser baru mengizinkan bunyi setelah layar pernah disentuh, jadi suara disiapkan pada sentuhan pertama akun ASGH / Gudang. Bunyi hanya saat aplikasi terbuka di layar. ---- */
+var TING = { ctx: null, until: 0, n: 0, dur: 0 };
+var TING_NOTES = [[0, 1047], [0.35, 1319], [0.7, 1568], [1.05, 2093], [2.4, 1047], [2.75, 1319], [3.1, 1568], [3.45, 2093]];          /* [detik, Hz]: dua kali tangga nada naik */
+var TING_DECAY = 1.1;
+function tingCtx() {
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    if (!TING.ctx) TING.ctx = new AC();
+    if (TING.ctx.state === 'suspended' && TING.ctx.resume) TING.ctx.resume();
+    return TING.ctx;
+  } catch (e) { return null; }
+}
+function tingUnlock() {          /* sentuhan pertama (siapa pun yang login): konteks suara dibuat dan dijalankan, supaya nanti boleh berbunyi tanpa disentuh */
+  var c = tingCtx();
+  if (c && c.state === 'running') ['touchstart', 'pointerdown', 'mousedown', 'keydown'].forEach(function (ev) { document.removeEventListener(ev, tingUnlock); });
+}
+['touchstart', 'pointerdown', 'mousedown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, tingUnlock, { passive: true }); });
+function tingPlay(c) {
+  var t0 = c.currentTime + 0.05, end = 0, mix = c.createGain();
+  mix.gain.value = 0.9; mix.connect(c.destination);
+  TING_NOTES.forEach(function (nt) {
+    var t = t0 + nt[0], g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + TING_DECAY);
+    g.connect(mix);
+    [[1, 1], [2.756, 0.3], [5.404, 0.12]].forEach(function (pt) {          /* nada dasar + dua nada atas = suara lonceng */
+      var o = c.createOscillator(), pg = c.createGain();
+      o.type = 'sine'; o.frequency.value = nt[1] * pt[0]; pg.gain.value = pt[1];
+      o.connect(pg); pg.connect(g); o.start(t); o.stop(t + TING_DECAY + 0.05);
+    });
+    end = Math.max(end, nt[0] + TING_DECAY + 0.05);
+  });
+  TING.n++; TING.dur = end; TING.until = Date.now() + end * 1000;
+}
+function bkaTing(force) {          /* hasil: false bila perangkat tidak mendukung suara */
+  var c = tingCtx(); if (!c) return false;
+  if (!force && Date.now() < TING.until) return true;          /* sedang berbunyi: jangan bertumpuk */
+  var t0 = Date.now(), go = function () { if (Date.now() - t0 < 8000) tingPlay(c); };          /* terlambat lebih dari 8 detik (menunggu izin) tidak dibunyikan lagi */
+  if (c.state === 'running') go(); else if (c.resume) { try { c.resume().then(go, function () {}); } catch (e) { /* abaikan */ } }
+  return true;
+}
+window.BKA_TING = TING; window.BKA_TING_PLAY = bkaTing;          /* kait untuk pengujian */
 /* pemberitahuan reservasi baru untuk ASGH / Gudang (selain angka merah): muncul sekali saat data baru masuk, bukan saat pertama kali dimuat */
 function rsNotify() {
   var R = S.rs, g = {}, a = {}, ms = [];
@@ -4039,7 +4151,7 @@ function rsNotify() {
   }
   R.kg = {}; R.ka = {};
   Object.keys(g).forEach(function (k) { R.kg[k] = 1; }); Object.keys(a).forEach(function (k) { R.ka[k] = 1; });
-  if (ms.length) toast(ms[0] + (ms.length > 1 ? ' (+' + (ms.length - 1) + ' lagi)' : ''));
+  if (ms.length) { toast(ms[0] + (ms.length > 1 ? ' (+' + (ms.length - 1) + ' lagi)' : '')); bkaTing(); }
 }
 function rsBadge() {
   var n = rsCount(), b = $('#rsbadge');
@@ -4241,7 +4353,8 @@ function vRsv() {
     : rsAcc() && !rsTeknik() ? 'Reservasi barang dari mekanik menunggu ACC Anda' + (S.me && S.me.jabatan ? ' sebagai <b>' + esc(S.me.jabatan) + '</b>' : '') + '. Salah satu Group Head / Section Head cukup.'
     : 'Mobil yang sedang dikerjakan Service Teknik otomatis masuk di sini lengkap dengan barang yang harus diganti. Pilih reservasi atau tidak; bila ya, Group Head / Section Head akan meng-ACC.';
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Reservasi</h2></div>' +
-    '<section class="pad">' + errBanner() + rsNav() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' + tabs +
+    '<section class="pad">' + errBanner() + rsNav() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' +
+    (rsOps() ? '<button type="button" class="btn ghost rs-tes" data-act="rstes">' + ic('spark', 'sm') + ' Tes suara pemberitahuan</button>' : '') + tabs +
     (tab === 'lap' ? '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
     '<div id="rs_list">' + rsListHtml() + '</div>' + foot() + '</section>';
 }
@@ -4265,10 +4378,11 @@ function vRsvManForm(f) {
     '<section class="pad"><div class="rs-form">' +
     '<dl class="kv"><dt>Nomor mobil</dt><dd><b>' + esc(f.n) + '</b></dd><dt>Mekanik</dt><dd>' + esc(f.mk || '-') + '</dd><dt>Jenis</dt><dd>' + esc(f.jn || '-') + '</dd><dt>Reservasi</dt><dd>' + esc(rsLbl(f)) + '</dd></dl>' +
     '<label for="rs_ket">Keterangan <em>opsional</em></label><textarea id="rs_ket" rows="2" maxlength="300" placeholder="Catatan untuk Group Head / Section Head">' + esc(f.ket || '') + '</textarea>' +
+    (rsPlOn(f) ? rsPlBlock(f) : '') +
     '<h3 class="rs-h">Barang yang dibutuhkan <em>ketik manual</em></h3><div id="rs_ex" class="rs-ex">' + ex + '</div>' +
     '<button type="button" class="btn ghost full rs-more" data-act="rsexadd">' + ic('plus', 'sm') + ' Tambah barang</button>' +
     '<div class="pkyn"><button class="btn pkdone" id="rs_ya" data-act="rsya">' + ic('check', 'sm') + ' Kirim Reservasi</button><button class="btn ghost" id="rs_tdk" data-act="rstdk">Batalkan</button></div>' +
-    '<div class="rs-err" id="rs_err" role="alert"></div>' +
+    '<div class="rs-err" id="rs_err" role="alert">' + esc(f.err || '') + '</div>' +
     '<div class="pktd-h">Reservasi menunggu ACC Group Head / Section Head. Setelah di-ACC, muncul di Laporan Reservasi mobil ini. Boleh diubah selama belum di-ACC. Masih kurang setelah di-ACC? Tekan "Butuh reservasi lagi" di Laporan.</div>' +
     '</div></section>';
 }
@@ -4283,10 +4397,11 @@ function vRsvForm() {
     '<dl class="kv"><dt>Nomor mobil</dt><dd><b>' + esc(f.n) + '</b></dd><dt>Mekanik</dt><dd>' + esc(f.mk || '-') + '</dd><dt>Jenis</dt><dd>' + esc(f.jn || '-') + '</dd>' + svRow + '</dl>' +
     '<label for="rs_ket">Keterangan <em>opsional</em></label><textarea id="rs_ket" rows="2" maxlength="300" placeholder="Catatan untuk Group Head / Section Head">' + esc(f.ket || '') + '</textarea>' +
     '<h3 class="rs-h">Reservasi</h3><div id="rs_items">' + rsItemsHtml(f) + '</div>' +
+    rsPlBlock(f) +
     '<h3 class="rs-h">Tambahan barang <em>manual</em></h3><div id="rs_ex" class="rs-ex">' + ex + '</div>' +
     '<div class="rs-q">Apakah Anda akan reservasi barang ini?</div>' +
     '<div class="pkyn"><button class="btn pkdone" id="rs_ya" data-act="rsya">' + ic('check', 'sm') + ' Ya</button><button class="btn ghost" id="rs_tdk" data-act="rstdk">Tidak</button></div>' +
-    '<div class="rs-err" id="rs_err" role="alert"></div>' +
+    '<div class="rs-err" id="rs_err" role="alert">' + esc(f.err || '') + '</div>' +
     '<div class="pktd-h">Bila Ya, reservasi menunggu ACC Group Head / Section Head. Setelah di-ACC, muncul di Laporan Reservasi mobil ini. Boleh diubah selama belum di-ACC.</div>' +
     '</div></section>';
 }
@@ -4304,10 +4419,13 @@ function rsExGrow(el) {          /* isian terakhir terisi -> muncul isian baru d
 function rsSendMan(y) {
   var f = S.rs.f, R = S.rs; if (!f || R.saving) return;
   var ex = rsExRead(), ket = ($('#rs_ket') || {}).value || '', er = $('#rs_err');
-  if (y && !ex.length) { if (er) er.textContent = 'Isi minimal satu barang, atau pilih Batalkan.'; var f0 = document.querySelector('#rs_ex .rs-exi'); if (f0) f0.focus(); return; }
+  var plOn = rsPlOn(f), pl = plOn ? rsPlSend(f.pl) : null;
+  if (y && plOn && pl.bo && !pl.bn.length) { if (er) er.textContent = 'Pilih posisi ban yang diganti (depan kiri / kanan, belakang kiri / kanan), atau matikan pilihan Ban.'; return; }
+  if (y && plOn && rsKerasFind(ex)) { if (er) er.textContent = '"' + rsKerasFind(ex) + '": Kopling, Ban, dan Accu dipilih di Pilihan penggantian, tidak diketik manual.'; return; }
+  if (y && !ex.length && !(plOn && rsPlAny(pl))) { if (er) er.textContent = plOn ? 'Isi minimal satu barang atau pilih Kopling / Ban / Accu, atau pilih Batalkan.' : 'Isi minimal satu barang, atau pilih Batalkan.'; var f0 = document.querySelector('#rs_ex .rs-exi'); if (f0) f0.focus(); return; }
   R.saving = 1; if (er) er.textContent = '';
   ['rs_ya', 'rs_tdk'].forEach(function (id) { var b = $('#' + id); if (b) b.disabled = true; });
-  gs('rsvManualSimpan', [{ u: meNip(), id: f.id, y: y, ket: ket.replace(/\s+/g, ' ').trim(), ex: ex }]).then(function (r) {
+  gs('rsvManualSimpan', [{ u: meNip(), id: f.id, y: y, ket: ket.replace(/\s+/g, ' ').trim(), ex: ex, pl: pl || undefined }]).then(function (r) {
     R.saving = 0; R.f = null;
     R.tab = r && r.locked ? 'lap' : (y ? 'acc' : 'isi'); R.h = '';
     toast(r && r.locked ? 'Reservasi ini sudah di-ACC ' + ((r.ap || {}).by || '') : y ? 'Reservasi dikirim, menunggu ACC' : 'Reservasi dibatalkan');
@@ -4323,10 +4441,13 @@ function rsSend(y) {
   var f = S.rs.f, R = S.rs; if (!f || R.saving) return;
   var ex = rsExRead(), ket = ($('#rs_ket') || {}).value || '', er = $('#rs_err'), svn = f.ns ? (($('#rs_sv') || {}).value || '').replace(/\D/g, '') : '';
   if (y && f.ns && !(+svn >= 1 && +svn <= 99)) { if (er) er.textContent = 'Isi nomor S servis dulu (contoh: 12), atau pilih Tidak.'; var sf = $('#rs_sv'); if (sf) sf.focus(); return; }
-  if (y && !rsFormItems(f).length && !ex.length) { if (er) er.textContent = 'Isi minimal satu barang di Tambahan barang, atau pilih Tidak.'; return; }
+  var pl = rsPlSend(f.pl);
+  if (y && pl.bo && !pl.bn.length) { if (er) er.textContent = 'Pilih posisi ban yang diganti (depan kiri / kanan, belakang kiri / kanan), atau matikan pilihan Ban.'; return; }
+  if (y && rsKerasFind(ex)) { if (er) er.textContent = '"' + rsKerasFind(ex) + '": Kopling, Ban, dan Accu dipilih di Pilihan penggantian, tidak diketik manual.'; return; }
+  if (y && !rsFormItems(f).length && !ex.length && !rsPlAny(pl)) { if (er) er.textContent = 'Isi minimal satu barang di Tambahan barang atau Pilihan penggantian, atau pilih Tidak.'; return; }
   R.saving = 1; if (er) er.textContent = '';
   ['rs_ya', 'rs_tdk'].forEach(function (id) { var b = $('#' + id); if (b) b.disabled = true; });
-  gs('rsvSimpan', [{ u: meNip(), n: f.n, sv0: f.sv0, sv: f.ns ? svn : f.sv0, y: y, ket: ket, ex: ex }]).then(function (r) {
+  gs('rsvSimpan', [{ u: meNip(), n: f.n, sv0: f.sv0, sv: f.ns ? svn : f.sv0, y: y, ket: ket, ex: ex, pl: pl }]).then(function (r) {
     R.saving = 0; R.f = null;
     R.tab = r && r.locked ? 'lap' : (y ? 'acc' : 'isi'); R.h = '';
     toast(r && r.locked ? 'Reservasi ini sudah di-ACC ' + ((r.ap || {}).by || '') : y ? 'Reservasi dikirim, menunggu ACC' : 'Dicatat: tidak reservasi');
@@ -4465,9 +4586,25 @@ var ACT = {
       S.rs.f = rsFormMan(mm); S.rs.saving = 0; go('rsvform'); return;
     }
     if (!rsTeknik()) { toast('Hanya mekanik Service Teknik yang mengisi Reservasi.', true); return; }
-    S.rs.f = c ? { n: c.n, sv0: c.sv, sv: c.sv, ns: c.ns ? 1 : 0, kd: c.kd || '', jn: c.jn, mk: c.mk, it: c.it, nk: c.nk, ket: c.ket || '', ex: [] }
-      : { n: p.n, sv0: p.sv, sv: p.sv, ns: 0, kd: '', jn: p.jn, mk: p.mk, it: p.au, nk: 0, ket: p.ket || '', ex: p.ex.slice() };
+    var pq = p ? rsPlParse(p.au) : null;          /* reservasi yang dibuka lagi: Kopling / Ban / Accu yang dipilih kembali tercentang, sisanya barang paket */
+    S.rs.f = c ? { n: c.n, sv0: c.sv, sv: c.sv, ns: c.ns ? 1 : 0, kd: c.kd || '', jn: c.jn, mk: c.mk, it: c.it, nk: c.nk, ket: c.ket || '', ex: [], pl: rsPlNew() }
+      : { n: p.n, sv0: p.sv, sv: p.sv, ns: 0, kd: '', jn: p.jn, mk: p.mk, it: pq.rest, nk: 0, ket: p.ket || '', ex: p.ex.slice(), pl: pq.pl };
     S.rs.saving = 0; go('rsvform');
+  },
+  rstes: function () { var ok = bkaTing(true); toast(ok ? 'Memutar suara pemberitahuan (sekitar 5 detik). Tidak terdengar? Naikkan volume HP / matikan mode senyap.' : 'Perangkat ini tidak mendukung suara.', !ok); },
+  rspl: function (a) {
+    var f = S.rs.f; if (!f || S.rs.saving) return;
+    var pl = f.pl || (f.pl = rsPlNew());
+    if (a === 'kp') pl.kp = pl.kp ? 0 : 1;
+    else if (a === 'ac') pl.ac = pl.ac ? 0 : 1;
+    else if (a === 'bo') { pl.bo = pl.bo ? 0 : 1; if (!pl.bo) pl.bn = []; }
+    rsPlUi();
+  },
+  rsbn: function (a) {
+    var f = S.rs.f; if (!f || S.rs.saving) return;
+    var pl = f.pl || (f.pl = rsPlNew()), i = pl.bn.indexOf(a);
+    if (i >= 0) pl.bn.splice(i, 1); else pl.bn.push(a);
+    rsPlUi();
   },
   rsya: function () { rsSend(1); },
   rstdk: function () { rsSend(0); },
@@ -4534,7 +4671,7 @@ var ACT = {
     var X = csCars(), ex = X.ex;
     if (X.bad) { toast('Ada No Mobil lain yang salah, dobel, atau tidak ada di Master kendaraan. Perbaiki atau hapus dulu.', true); return; }
     var ls = ex.map(function (g) { return g.n; }).join(', ');
-    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p + (ex.length ? ' + ' + ex.length + ' mobil lain: ' + ls : ''), free: izinBebas(C.p), q: ex.length ? 'Apakah Anda akan mengerjakan ' + (1 + ex.length) + ' unit ini?' : 'Apakah Anda akan mengerjakan unit ini?',
+    askStart({ n: f.n, k: 'cs', t: 'Corrective Supporting', iz: C.p + (ex.length ? ' + ' + ex.length + ' mobil lain: ' + ls : ''), free: izinBebas(C.p), q: f.ro ? 'Apakah Anda akan mengerjakan Rebuild Spare part (RO)?' : ex.length ? 'Apakah Anda akan mengerjakan ' + (1 + ex.length) + ' unit ini?' : 'Apakah Anda akan mengerjakan unit ini?',
       info: '<dt>Pekerjaan</dt><dd>' + esc(C.p) + '</dd><dt>Jabatan</dt><dd>' + esc((S.me && S.me.jabatan) || '-') + '</dd>' + (f.jn ? '<dt>Jenis</dt><dd>' + esc(f.jn) + '</dd>' : '') + (f.pl ? '<dt>Nomor Plat</dt><dd>' + esc(f.pl) + '</dd>' : '') + (ex.length ? '<dt>Mobil lain</dt><dd>' + esc(ls) + '</dd>' : '') },
       function () { csBegin(f, ex); });
   },
@@ -4654,7 +4791,7 @@ var ACT = {
       }
       j.t = ps.join(', '); j.e = pkNow(j); j.ap = null; pkJobSave(); pkShow(); pkSync(); toast('Pengerjaan PEM selesai, waktu berhenti'); return;
     }
-    if (csModulJ(j) && phFilled(j) < phMin(j)) {          // Perawatan mojul: minimal 1 foto selesai (maksimal 5)
+    if (csFotoJ(j) && phFilled(j) < phMin(j)) {          // Perawatan mojul / Rebuild Spare part RO: minimal 1 foto selesai (maksimal 5 / 3)
       var tm = $('#pk_t'); if (tm) j.t = tm.value; pkJobSave();
       toast('Masukkan minimal ' + phMin(j) + ' foto dulu (' + phFilled(j) + '/' + phSlots(j).length + '). Waktu baru berhenti setelah foto ada.', true);
       var pm = $('#pk_ph'); if (pm) { try { pm.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
@@ -4735,7 +4872,7 @@ var ACT = {
     if (it.j === 'teknik' || it.j === 'ki') {          /* Form Fokus / foto kendaraan: halaman Detail Laporan Service */
       S.ls.mode = 'hari'; S.ls.d = it.d; S.ls.rm = it.d.slice(0, 7); S.ls.open = it.id; go('lapfokus'); S.ls.from = 'appr'; return;
     }
-    var head = '<div class="sh-head"><b>' + (it.j === 'las' ? 'Foto Selesai Ketok' : apModul(it) ? 'Foto Perawatan Mojul' : 'Foto Selesai Cat') + ' #' + esc(it.n) + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>';
+    var head = '<div class="sh-head"><b>' + (it.j === 'las' ? 'Foto Selesai Ketok' : apModul(it) ? 'Foto Perawatan Mojul' : apRo(it) ? 'Foto Part Rebuild' : 'Foto Selesai Cat') + (apRo(it) ? ' (RO)' : ' #' + esc(it.n)) + '</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>';
     if (it.j === 'tb') {
       showModal(head + '<div class="lf-phs">' + (it.fs || []).map(function (id, i) {
         var u = 'https://drive.google.com/uc?id=' + id, th = phThumb(u);
@@ -4745,7 +4882,7 @@ var ACT = {
     }
     showModal(head + '<div id="ap_ph"><div class="empty">Memuat foto...</div></div>');
     gs('getFotoService', [meNip(), it.id]).then(function (res) {
-      var e = $('#ap_ph'); if (e) e.innerHTML = res && res.ok && (res.slots || []).length ? apPhGrid(res.slots, apModul(it) ? 'cs' : it.j === 'las') : '<div class="empty">Foto belum ada.</div>';
+      var e = $('#ap_ph'); if (e) e.innerHTML = res && res.ok && (res.slots || []).length ? apPhGrid(res.slots, apModul(it) ? 'cs' : apRo(it) ? 'ro' : it.j === 'las') : '<div class="empty">Foto belum ada.</div>';
     }, function (er) { var e = $('#ap_ph'); if (e) e.innerHTML = '<div class="empty">Gagal memuat foto.<br><small>' + esc(msg(er)) + '</small></div>'; });
   },
   catrevisi: function () {
