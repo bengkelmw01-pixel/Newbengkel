@@ -128,6 +128,9 @@ input,select,textarea{font:inherit;color:inherit}
 .t-ki .count{background:var(--grnbg);color:var(--grn)}.t-ki b{color:#0b3a66}
 .vchip{display:flex;align-items:center;gap:6px;border-radius:12px;padding:10px 10px;font-weight:800;color:#6a14e8;background:#efe9ff;flex:none;width:150px}
 .vchip.kal{background:#fdeeb0;color:#5b3300}
+.vcol{display:flex;flex-direction:column;gap:5px;flex:none;width:150px}.vcol .vchip{width:100%;box-sizing:border-box}
+.vjd{display:block;text-align:center;font-size:12.5px;font-weight:800;letter-spacing:.3px;border-radius:9px;padding:3px 6px}
+.vjd.kal{background:#fdeeb0;color:#5b3300}.vjd.cs{background:#e1efff;color:#0a4fb4}.vjd.oth{background:#eef0f6;color:#44506f}
 .kmb{border-radius:12px;padding:10px 12px;font-weight:800;text-align:center;min-width:84px;flex:none}
 .kmb.red{background:var(--redbg);color:var(--red)}.kmb.org{background:#fff0d6;color:#e8590c}
 .stNOPR{color:#0d9d63;font-weight:700}.stOSNO{color:#ef6b00;font-weight:700}
@@ -469,7 +472,7 @@ body.on-nomo .toast{bottom:104px}
  .tr.th{top:63px}
 }
 @media (min-width:1100px){.grid2.d{grid-template-columns:repeat(4,1fr)}}
-@media (max-width:420px){.kmv .ic{display:none}.dtp .pw{display:none}.nchip{padding:8px}.vchip{width:128px;font-size:14px}.kmb{min-width:70px;padding:9px 8px}}
+@media (max-width:420px){.kmv .ic{display:none}.dtp .pw{display:none}.nchip{padding:8px}.vchip{width:128px;font-size:14px}.vcol{width:128px}.vjd{font-size:12px}.kmb{min-width:70px;padding:9px 8px}}
 
 /* Laporan Jam Kerja Mekanik */
 .lj-head{display:flex;align-items:center;gap:12px;width:100%;background:linear-gradient(135deg,#f9fbff,#eaf0ff);border:1px solid #dfe8fb;border-radius:20px;padding:14px 14px 14px 12px;box-shadow:0 4px 16px rgba(26,79,216,.10);cursor:pointer}

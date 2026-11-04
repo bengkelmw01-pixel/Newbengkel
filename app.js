@@ -207,7 +207,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-04 06:45';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-04 06:57';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -1197,6 +1197,9 @@ function listLap(el, q) {
   }).join('') + (rows.length > lim ? '<button class="btn ghost more" data-act="more" data-a="dash">Tampilkan lebih banyak (' + (rows.length - lim) + ' lagi)</button>' : '');
 }
 
+/* status mobil di bawah nomor mobil: KALONG / CS (kolom "Jadwal Mobil" Master kendaraan) */
+function vjd(sh) { return sh ? '<span class="vjd ' + (sh === 'KALONG' ? 'kal' : sh === 'CS' ? 'cs' : 'oth') + '">' + esc(sh === 'KALONG' ? 'Kalong' : sh) + '</span>' : ''; }
+function vcol(n, sh) { var kal = sh === 'KALONG'; return '<div class="vcol"><span class="vchip' + (kal ? ' kal' : '') + '">' + ic(kal ? 'moon' : 'car', 'sm') + '#' + esc(n) + '</span>' + vjd(sh) + '</div>'; }
 function listSvc(el, v, q) {
   var all = S.svc[v], rows = all.filter(function (r) {
     if (!q) return true;
@@ -1209,8 +1212,8 @@ function listSvc(el, v, q) {
     var m = S.mi[r.n] || {}, sh = m.sh || '', kal = sh === 'KALONG';
     var stc = /^[A-Z]+$/.test(r.st) ? ' st' + r.st : '';
     return '<button class="item" data-act="svc" data-a="' + v + '" data-b="' + all.indexOf(r) + '">' +
-      '<span class="vchip' + (kal ? ' kal' : '') + '">' + ic(kal ? 'moon' : 'car', 'sm') + '#' + esc(r.n) + '</span>' +
-      '<div class="mid"><b>' + esc(r.c || '-') + '</b><small>' + (sh ? 'Shift: ' + esc(sh) + ' &nbsp;' : '') + '<span class="' + stc.trim() + '">Status: ' + esc(r.st || '-') + '</span></small>' +
+      vcol(r.n, sh) +
+      '<div class="mid"><b>' + esc(r.c || '-') + '</b><small><span class="' + stc.trim() + '">Status: ' + esc(r.st || '-') + '</span></small>' +
       '<small class="t">' + esc(r.d) + '</small></div>' +
       '<span class="kmb ' + (r.s > 0 ? 'red' : 'org') + '">' + fmt(r.s) + ' KM</span></button>';
   }).join('') + (rows.length > lim ? '<button class="btn ghost more" data-act="more" data-a="' + v + '">Tampilkan lebih banyak (' + (rows.length - lim) + ' lagi)</button>' : '');
@@ -2054,7 +2057,7 @@ function pkListHtml() {
   var n0 = pkNum(p.n), out = '';
   if (n0 && S.mi[n0] && !all.some(function (r) { return r.n === n0; })) {   // mobil ada di Master tapi belum masuk daftar service: tetap boleh dikerjakan
     var mo = S.mi[n0], tdo = tdFor(n0, jn), slo = tdo ? null : selFor(n0, jn);
-    out = '<div class="item pkit out"><span class="vchip">' + ic('car', 'sm') + '#' + esc(n0) + '</span><div class="mid"><b>Di luar daftar service</b><small>' + esc(mo.j || '-') + '</small></div>' +
+    out = '<div class="item pkit out">' + vcol(n0, mo.sh || '') + '<div class="mid"><b>Di luar daftar service</b><small>' + esc(mo.j || '-') + '</small></div>' +
       (tdo ? pkTdHtml(tdo) : slo ? pkSelHtml(slo) : '') +
       '<button class="btn' + (slo ? ' ghost' : '') + ' pkit-go" data-act="pkgo" data-a="' + jn + '" data-b="' + esc(n0) + '">' + ic('wrench', 'sm') + ' ' + (tdo ? 'Lanjutkan' : slo ? 'Kerjakan lagi' : 'Kerjakan') + '</button></div>';
   }
@@ -2063,8 +2066,8 @@ function pkListHtml() {
   if (!rows.length) return head + out + '<div class="empty">' + (all.length ? 'Tidak ada mobil yang cocok.' : 'Tidak ada unit dengan Selisih KM di atas ' + S.svc_lim[jn] + '.') + '</div>';
   return head + out + rows.slice(0, lim).map(function (r) {
     var m = S.mi[r.n] || {}, sh = m.sh || '', kal = sh === 'KALONG', stc = /^[A-Z]+$/.test(r.st) ? ' st' + r.st : '', td = tdFor(r.n, jn), sl = td ? null : selFor(r.n, jn);
-    return '<div class="item pkit"><span class="vchip' + (kal ? ' kal' : '') + '">' + ic(kal ? 'moon' : 'car', 'sm') + '#' + esc(r.n) + '</span>' +
-      '<div class="mid"><b>' + esc(r.c || '-') + '</b><small>' + (sh ? 'Shift: ' + esc(sh) + ' &nbsp;' : '') + '<span class="' + stc.trim() + '">Status: ' + esc(r.st || '-') + '</span></small>' +
+    return '<div class="item pkit">' + vcol(r.n, sh) +
+      '<div class="mid"><b>' + esc(r.c || '-') + '</b><small><span class="' + stc.trim() + '">Status: ' + esc(r.st || '-') + '</span></small>' +
       '<small class="t">' + esc(r.d) + '</small></div>' +
       '<span class="kmb ' + (r.s > 0 ? 'red' : 'org') + '">' + fmt(r.s) + ' KM</span>' + (td ? pkTdHtml(td) : sl ? pkSelHtml(sl) : '') +
       '<button class="btn' + (sl ? ' ghost' : '') + ' pkit-go" data-act="pkgo" data-a="' + jn + '" data-b="' + esc(r.n) + '">' + ic('wrench', 'sm') + ' ' + (td ? 'Lanjutkan' : sl ? 'Kerjakan lagi' : 'Kerjakan') + '</button></div>';
