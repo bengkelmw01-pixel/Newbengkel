@@ -30,7 +30,7 @@ var S = {
   pem: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   las: { d: '', q: '', st: 'all', rows: {}, busy: {}, err: '', pick: null },
   ls: { d: '', rm: '', mode: 'hari', jenis: 'all', q: '', rows: {}, busy: {}, err: '', open: '', det: {}, dl: 0 },
-  rd: { d: '', rm: '', mode: 'hari', f: '', rows: {}, busy: {}, err: '' },
+  rd: { d: '', rm: '', mode: 'hari', f: '', fm: '', fmn: '', rows: {}, busy: {}, err: '' },
   me: null, auth: 'wait', loginNip: '', loginErr: '', loginBusy: false,
   users: { rows: null, presets: [], setup: false, err: '', busy: false, old: '', ak: null },
   zp: { rows: null, done: [], h: '', busy: false, err: '', last: 0 }, iz: null,
@@ -166,7 +166,7 @@ function go(v) {
   }
   if (v === 'jobpk' && S.view !== 'jobpk' && !S.pk.job) S.pk.n = '';
   if ((v === 'ck' || v === 'tb' || v === 'pem' || v === 'las') && S.view !== 'ck' && S.view !== 'tb' && S.view !== 'pem' && S.view !== 'las' && S.view !== 'jobpk' && S.view !== 'lc') { S[v].d = todayIso(); S[v].q = ''; S[v].st = 'all'; }
-  if (v === 'redo' && S.view !== 'redo') { S.rd.d = todayIso(); S.rd.rm = S.rd.d.slice(0, 7); S.rd.f = ''; }
+  if (v === 'redo' && S.view !== 'redo') { S.rd.d = todayIso(); S.rd.rm = S.rd.d.slice(0, 7); S.rd.f = ''; S.rd.fm = ''; S.rd.fmn = ''; }
   if (v === 'lapsvc' && S.view !== 'lapfokus' && S.view !== 'lapsvc') { S.ls.d = todayIso(); S.ls.rm = S.ls.d.slice(0, 7); S.ls.q = ''; S.ls.jenis = 'all'; }
   if (v !== S.view) S.prev = S.view;
   S.view = v; closeMenu(); closeModal();
@@ -210,7 +210,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-05 07:37';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-05 08:22';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -3694,18 +3694,31 @@ function rdJenisCell(r) {
   var cls = r.jn === 'CK' ? 'ck' : (r.jn === 'Cek baik' ? 'cb' : (r.jn === 'AFR' ? 'afr' : 'cs'));
   return r.jn ? '<span class="rd-jn ' + cls + '">' + esc(r.jn) + '</span>' + (r.kt === 'Kerusakan lain' ? '<small class="rd-sub">Kerusakan lain</small>' : '') : '<span class="mut">-</span>';
 }
-/* filter Jenis laporan: klik judul kolom -> pilih Semua / CK / Cek baik / AFR / CS; tabel hanya menampilkan jenis itu (Kerusakan lain termasuk CK) */
-var RD_JENIS = ['CK', 'Cek baik', 'AFR', 'CS'];
+/* filter Jenis laporan: klik judul kolom -> pilih Semua / CK / Cek baik / AFR / CS; tabel hanya menampilkan jenis itu (Kerusakan lain termasuk CK).
+   filter Mekanik sebelumnya: klik judul kolom -> pilih satu nama mekanik (urut abjad, dengan jumlah laporan); keduanya bisa dipakai bersamaan */
+var RD_JENIS = ['CK', 'Cek baik', 'AFR', 'CS'], RD_KOSONG = '__kosong';
+function rdMsKey(r) { return String(r.ms || '').trim().toLowerCase() || RD_KOSONG; }
+function rdRows(sc, skipJ, skipM) {
+  var R = S.rd;
+  return sc.filter(function (r) { return (skipJ || !R.f || r.jn === R.f) && (skipM || !R.fm || rdMsKey(r) === R.fm); });
+}
+function rdFltLbl() {
+  var R = S.rd, a = [];
+  if (R.f) a.push('berjenis <b>' + esc(R.f) + '</b>');
+  if (R.fm) a.push(R.fm === RD_KOSONG ? 'tanpa data <b>Mekanik sebelumnya</b>' : 'dengan Mekanik sebelumnya <b>' + esc(R.fmn || R.fm) + '</b>');
+  return a.join(' ');
+}
 function rdTable(rows) {
   var R = S.rd, last = '', no = 0, tr = '';
-  if (!rows.length) tr = '<tr><td colspan="8" class="rd-none">Tidak ada laporan berjenis <b>' + esc(R.f) + '</b> ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '. Klik judul kolom Jenis laporan untuk memilih jenis lain.</td></tr>';
+  if (!rows.length) tr = '<tr><td colspan="8" class="rd-none">Tidak ada laporan ' + rdFltLbl() + ' ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '. Klik judul kolom Jenis laporan atau Mekanik sebelumnya untuk memilih yang lain.</td></tr>';
   rows.forEach(function (r) {
     if (R.mode === 'bulan' && r.d !== last) { last = r.d; var p = isoParts(r.d); tr += '<tr class="rd-day"><td colspan="8">' + HARI[isoDow(r.d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</td></tr>'; }
     no++;
     var jn = rdJenisCell(r);
     tr += '<tr><td class="no">' + no + '</td><td>' + jn + '</td><td><b>' + esc(r.n) + '</b></td><td class="kl">' + esc(r.kl || '-') + '</td><td class="kl">' + (r.ss ? esc(r.ss) + (r.sd ? '<small class="rd-sub">' + esc(dmyIso(r.sd)) + '</small>' : '') : '') + '</td><td>' + esc(r.ms || '') + '</td><td class="kl">' + esc(r.tk || '-') + '</td><td>' + esc(r.mk || '-') + '</td></tr>';
   });
-  return '<div class="rd-w"><table class="rd-tbl"><thead><tr><th>No</th><th><button type="button" class="rd-flt' + (R.f ? ' on' : '') + '" data-act="rdflt" aria-label="Pilih jenis laporan">' + (R.f ? esc(R.f) : 'Jenis laporan') + ic('down', 'sm') + '</button></th><th>Nomor mobil</th><th>Isi keluhan</th><th>Service sebelumnya</th><th>Mekanik sebelumnya</th><th>Keterangan</th><th>Mekanik yang kerjakan</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
+  var mlbl = R.fm ? (R.fm === RD_KOSONG ? 'Tanpa mekanik' : (R.fmn || R.fm)) : 'Mekanik sebelumnya';
+  return '<div class="rd-w"><table class="rd-tbl"><thead><tr><th>No</th><th><button type="button" class="rd-flt' + (R.f ? ' on' : '') + '" data-act="rdflt" aria-label="Pilih jenis laporan">' + (R.f ? esc(R.f) : 'Jenis laporan') + ic('down', 'sm') + '</button></th><th>Nomor mobil</th><th>Isi keluhan</th><th>Service sebelumnya</th><th><button type="button" class="rd-flt' + (R.fm ? ' on' : '') + '" data-act="rdmflt" aria-label="Pilih nama mekanik sebelumnya">' + esc(mlbl) + ic('down', 'sm') + '</button></th><th>Keterangan</th><th>Mekanik yang kerjakan</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
 }
 /* ---- CK mekanik Teknik: akumulasi sebulan ----
    Mekanik = user Pengaturan berbagian Teknik (server: tk). Satu CK dihitung ke "Mekanik sebelumnya" (mekanik yang mengerjakan service terakhir mobil itu) dari tiap laporan Redo Job berjenis CK
@@ -3748,7 +3761,7 @@ function rdBody() {
   if (!sc) return R.err ? '<div class="empty">Gagal memuat Laporan Redo Job.<br><small>' + esc(R.err) + '</small><br><small>Pastikan Code.gs terbaru sudah dipasang di Apps Script (fungsi getRedoJob).</small></div>' : '<div class="empty">Memuat laporan...</div>';
   if (!sc.length) return '<div class="empty">Belum ada laporan Redo Job ' + (R.mode === 'bulan' ? 'pada bulan ini' : 'pada tanggal ini') + '.<br><small>Muncul setelah Group Head / Section Head meng-ACC pekerjaan CK. Keluhan Ban, tambal ban, IOT, lampu, dan Argo tidak termasuk.</small></div>' + rdMk();
   var er = (R.rows[rdYm()] || {}).e;
-  return (er ? '<div class="rd-note">Service sebelumnya belum terbaca dari data aplikasi: ' + esc(er) + '</div>' : '') + rdTable(R.f ? sc.filter(function (r) { return r.jn === R.f; }) : sc) + '<div class="rd-hint">Geser tabel ke kanan untuk melihat kolom lainnya.</div>' + rdMk();
+  return (er ? '<div class="rd-note">Service sebelumnya belum terbaca dari data aplikasi: ' + esc(er) + '</div>' : '') + rdTable(rdRows(sc)) + '<div class="rd-hint">Geser tabel ke kanan untuk melihat kolom lainnya.</div>' + rdMk();
 }
 function vRedo() {
   var head = '<div class="ls-head"><div class="ls-hi">' + ic('redo') + '</div><div><h3>Laporan Redo Job</h3><p>Laporan CK yang sudah di-ACC GH / SH</p></div></div>';
@@ -5372,7 +5385,7 @@ var ACT = {
     renderShell(); rdFetch(rdYm());
   },
   rdflt: function () {
-    var R = S.rd, sc = rdScope() || [], cn = { '': sc.length };
+    var R = S.rd, sc = rdRows(rdScope() || [], 1, 0), cn = { '': sc.length };
     RD_JENIS.forEach(function (j) { cn[j] = sc.filter(function (r) { return r.jn === j; }).length; });
     var it = function (v, lbl) { return '<button type="button" class="rdf-it' + (R.f === v ? ' on' : '') + '" data-act="rdfsel" data-a="' + esc(v) + '"><b>' + esc(lbl) + '</b><span>' + cn[v] + (R.f === v ? ic('check', 'sm') : '') + '</span></button>'; };
     showModal('<div class="sh-head"><b>Jenis laporan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
@@ -5380,6 +5393,27 @@ var ACT = {
   },
   rdfsel: function (a) {
     var R = S.rd; R.f = RD_JENIS.indexOf(a) >= 0 ? a : ''; closeModal();
+    var b = $('#rd_body'); if (b) b.innerHTML = rdBody();
+  },
+  /* filter Mekanik sebelumnya: daftar nama dari laporan yang sedang tampil (harian/bulanan), urut abjad, jumlahnya mengikuti filter Jenis laporan */
+  rdmflt: function () {
+    var R = S.rd, sc = rdRows(rdScope() || [], 0, 1), g = {}, kos = 0;
+    sc.forEach(function (r) { var k = rdMsKey(r); if (k === RD_KOSONG) { kos++; return; } if (!g[k]) g[k] = { k: k, n: rdNama(String(r.ms).trim()), c: 0 }; g[k].c++; });
+    var ls = Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return a.k < b.k ? -1 : (a.k > b.k ? 1 : 0); });
+    if (R.fm && R.fm !== RD_KOSONG && !g[R.fm]) ls.push({ k: R.fm, n: R.fmn || R.fm, c: 0 });
+    var it = function (v, lbl, c) { return '<button type="button" class="rdf-it' + (R.fm === v ? ' on' : '') + '" data-act="rdmsel" data-a="' + esc(v) + '"><b>' + esc(lbl) + '</b><span>' + c + (R.fm === v ? ic('check', 'sm') : '') + '</span></button>'; };
+    showModal('<div class="sh-head"><b>Mekanik sebelumnya</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+      '<div class="rdf-list">' + it('', 'Semua mekanik', sc.length) + ls.map(function (m) { return it(m.k, m.n, m.c); }).join('') + (kos || R.fm === RD_KOSONG ? it(RD_KOSONG, 'Tanpa data mekanik', kos) : '') + '</div>');
+  },
+  rdmsel: function (a) {
+    var R = S.rd, sc = rdScope() || [], hit = null;
+    R.fm = ''; R.fmn = '';
+    if (a === RD_KOSONG) R.fm = RD_KOSONG;
+    else if (a) {
+      sc.forEach(function (r) { if (!hit && rdMsKey(r) === a) hit = r; });
+      if (hit) { R.fm = a; R.fmn = rdNama(String(hit.ms).trim()); }
+    }
+    closeModal();
     var b = $('#rd_body'); if (b) b.innerHTML = rdBody();
   },
   rdday: function (a) { var R = S.rd, nd = isoAdd(R.d, +a); if (nd > todayIso()) return; R.d = nd; renderShell(); rdFetch(rdYm()); },
