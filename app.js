@@ -34,7 +34,7 @@ var S = {
   me: null, auth: 'wait', loginNip: '', loginErr: '', loginBusy: false,
   users: { rows: null, presets: [], setup: false, err: '', busy: false, old: '', ak: null },
   zp: { rows: null, done: [], h: '', busy: false, err: '', last: 0 }, iz: null,
-  ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik', 'Kerusakan lain', 'CS', 'AFR'], kb: ['Teknik', 'Keindahan'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
+  ap: { rows: null, done: [], h: '', busy: false, err: '', tab: 'wait', kt: ['CK', 'Cek baik', 'Kerusakan lain', 'CS', 'AFR'], kb: ['Teknik', 'Keindahan', 'TB'], kq: ['Baik', 'Meler', 'Belang', 'Pudar', 'Kulit jeruk', 'Gelembung', 'Pecah'], saving: 0, last: 0 },
   td: { rows: null, ssel: [], sel: [], loc: [], h: '', busy: false, err: '' },
   rs: { cand: null, pend: [], done: [], h: '', busy: false, err: '', last: 0, tab: '', q: '', f: null, saving: 0, dl: 0, day: '', kg: null, ka: null, rsb: 0 },
   lc: { d: '', rows: null, h: '', err: '', busy: 0, n: '', cek: null, cekWait: 0, cekFor: '', fo: [null, null, null], up: {}, busyS: 0, prog: '', rq: '', msg: '', done: null, tgt: null, af: null }
@@ -210,7 +210,7 @@ function errBanner() {
 function searchBar(id, ph, val) {
   return '<div class="searchbar">' + ic('search') + '<input id="' + id + '" type="search" autocomplete="off" placeholder="' + esc(ph) + '" value="' + esc(val || '') + '"></div>';
 }
-var APP_BUILD = '2026-11-05 08:22';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
+var APP_BUILD = '2026-11-07 21:00';          /* tanda versi tampilan (Index.html); tanda versi server (Code.gs) datang lewat getJobBadge */
 function verTxt(v) { v = String(v || ''); return /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(v) ? v.slice(8, 10) + '/' + v.slice(5, 7) + ' ' + v.slice(11) : '?'; }
 function svSet(v) { if (v && v !== S.sv) { S.sv = v; Array.prototype.forEach.call(document.querySelectorAll('.vsv'), function (e) { e.textContent = verTxt(v); }); } }
 function verHtml() { return 'Versi tampilan <b>' + verTxt(APP_BUILD) + '</b> &middot; server <b class="vsv">' + verTxt(S.sv) + '</b>'; }
@@ -751,6 +751,18 @@ function ljYm() { var v = S.view; return v === 'jam' ? S.jam.d.slice(0, 7) : S.j
 /* Jam kerja minimal per mekanik per hari kerja: JAM_MIN menit ke atas = hijau, kurang = merah.
    Hari kerja = tanggal shift dimulai: pekerjaan Shift 3 yang mulai sebelum pukul 15:00 (lewat tengah malam) dihitung ke tanggal sebelumnya. Belum diatur = Shift 1 (tanggal mulai kerja). */
 var JAM_MIN = 400, SH3_CUT = 15 * 60;
+/* Mekanik setengah hari: pada hari kerjanya yang tercantum di bawah, batas hijau adalah JAM_MIN_SETENGAH menit (bukan JAM_MIN). Hari lain tetap JAM_MIN.
+   Hari = hari kerja (tanggal shift dimulai): untuk shift malam, "Jumat" berarti shift yang dimulai Jumat malam (kerja sesudah tengah malam dihitung ke hari itu; Shift mekanik malam harus '3' di Pengaturan > User & Akses).
+   Nama dicocokkan dengan Nama user (tidak peka huruf besar-kecil): sama persis, atau diawali nama itu + spasi (mis. "Dani Setiawan" cocok dengan "Dani"). Ubah daftar ini bila jadwal berubah. */
+var JAM_MIN_SETENGAH = 280;
+var JAM_SETENGAH = [['Dani', 'Sabtu'], ['Deviana', 'Rabu'], ['Nurul huda', 'Kamis'], ['Rizal', 'Jumat'], ['Azis', 'Minggu'], ['Supriadi', 'Senin'], ['Agus', 'Selasa'], ['Rohman', 'Rabu'], ['Ridwan', 'Kamis']];
+function ljHalf(nm, dt) {          /* true bila mekanik nm bekerja setengah hari pada hari kerja dt (yyyy-MM-dd) */
+  var n = String(nm || '').toLowerCase().replace(/\s+/g, ' ').trim(), hr = HARI[isoDow(dt)].toLowerCase(), i, h;
+  if (!n) return false;
+  for (i = 0; i < JAM_SETENGAH.length; i++) { h = String(JAM_SETENGAH[i][0]).toLowerCase(); if (String(JAM_SETENGAH[i][1]).toLowerCase() === hr && (n === h || n.indexOf(h + ' ') === 0)) return true; }
+  return false;
+}
+function ljMin(nm, dt) { return ljHalf(nm, dt) ? JAM_MIN_SETENGAH : JAM_MIN; }          /* batas hijau (menit) mekanik nm pada hari kerja dt */
 function ljSd(r) { return r.sh === '3' && tmin(r.s) != null && tmin(r.s) < SH3_CUT ? isoAdd(r.d, -1) : r.d; }
 function ljNext(ym) { var n = ymAdd(ym, 1); return n <= todayIso().slice(0, 7) ? n : ''; }          /* bulan berikutnya (bila sudah ada): memuat sisa shift malam tanggal terakhir bulan ini */
 function ljPool(ym) {                                          /* semua baris yang hari kerjanya jatuh pada bulan ym */
@@ -1062,13 +1074,14 @@ function vJam() {
   else if (!g.length) box += '<div class="empty">Belum ada data jam kerja pada tanggal ini.</div>';
   else {
     var body = g.map(function (x, i) {
-      var sel = x.run ? '<span class="lj-run">Berjalan</span>' : (x.sb || '-'), cl = x.tot >= JAM_MIN ? ' lj-ok' : ' lj-low';
+      var sel = x.run ? '<span class="lj-run">Berjalan</span>' : (x.sb || '-'), half = ljHalf(x.nm, d), cl = x.tot >= (half ? JAM_MIN_SETENGAH : JAM_MIN) ? ' lj-ok' : ' lj-low';
       /* di HP kolom NIP, Jabatan, Jam Selesai, Total Menit digabung ke kolom di sebelahnya (class dk-c disembunyikan, fragmen class mo hanya tampil di HP) sehingga seluruh tabel muat tanpa digeser */
-      return '<tr><td>' + (i + 1) + '</td><td class="dk-c">' + esc(x.nip) + '</td><td class="l' + cl + '">' + esc(x.nm) + (x.sh ? '<small class="sh">Shift ' + x.sh + '</small>' : '') + '<small class="mo">NIP ' + esc(x.nip) + (x.sh ? ' &middot; Shift ' + x.sh : '') + '</small></td><td>' + esc(x.bg) + '<small class="mo">' + esc(x.jb) + '</small></td><td class="dk-c">' + esc(x.jb) + '</td><td>' + esc(x.sa || '-') + '<small class="mo">s/d ' + sel + '</small></td><td class="dk-c">' + sel + '</td>' +
+      return '<tr><td>' + (i + 1) + '</td><td class="dk-c">' + esc(x.nip) + '</td><td class="l' + cl + '">' + esc(x.nm) + (x.sh || half ? '<small class="sh">' + (x.sh ? 'Shift ' + x.sh : '') + (x.sh && half ? ' &middot; ' : '') + (half ? 'Setengah hari' : '') + '</small>' : '') + '<small class="mo">NIP ' + esc(x.nip) + (x.sh ? ' &middot; Shift ' + x.sh : '') + (half ? ' &middot; Setengah hari' : '') + '</small></td><td>' + esc(x.bg) + '<small class="mo">' + esc(x.jb) + '</small></td><td class="dk-c">' + esc(x.jb) + '</td><td>' + esc(x.sa || '-') + '<small class="mo">s/d ' + sel + '</small></td><td class="dk-c">' + sel + '</td>' +
         '<td class="' + cl.trim() + '">' + (x.fin ? jamTxt(x.tot) : '-') + '<small class="mo">' + (x.fin ? x.tot + ' menit' : '') + '</small></td><td class="dk-c' + cl + '">' + (x.fin ? x.tot : '-') + '</td><td><a data-act="ljhist" data-a="' + i + '">Lihat<span class="mo"><br></span> history</a></td></tr>';
     }).join('');
     box += ljTable([{ t: 'No' }, { t: 'NIP', c: 'dk-c' }, { t: '<span class="dk">Nama</span><span class="mo">Nama /<br>NIP</span>', l: 1 }, { t: '<span class="dk">Bagian</span><span class="mo">Bagian /<br>Jabatan</span>' }, { t: 'Jabatan', c: 'dk-c' }, { t: '<span class="dk">Jam<br>Mulai</span><span class="mo">Mulai /<br>Selesai</span>' }, { t: 'Jam<br>Selesai', c: 'dk-c' }, { t: '<span class="dk">Total Jam</span><span class="mo">Total</span>' }, { t: 'Total<br>Menit', c: 'dk-c' }, { t: '<span class="dk">History<br>Pengerjaan</span><span class="mo">History</span>' }], body, '', 800) +
-      '<div class="lj-leg"><span><i class="g"></i>Hijau: total ' + JAM_MIN + ' menit atau lebih</span><span><i class="r"></i>Merah: kurang dari ' + JAM_MIN + ' menit (jam kerja hari itu belum cukup)</span></div>';
+      '<div class="lj-leg"><span><i class="g"></i>Hijau: total ' + JAM_MIN + ' menit atau lebih</span><span><i class="r"></i>Merah: kurang dari ' + JAM_MIN + ' menit (jam kerja hari itu belum cukup)</span>' +
+        (g.some(function (x) { return ljHalf(x.nm, d); }) ? '<span><i class="g"></i>Setengah hari: hijau mulai ' + JAM_MIN_SETENGAH + ' menit</span>' : '') + '</div>';
   }
   box += '</div>';
   var rekap = '<div class="lj-rekap"><div class="lj-rh">' + ic('report') + '<div><h3>Rekap Laporan Harian dan Bulanan</h3><p>Lihat rekap jam kerja mekanik dalam bentuk laporan harian dan bulanan</p></div></div>' +
@@ -1125,7 +1138,7 @@ function vJamBulan() {
 function ljHist(i) {
   var J = S.jam, R = J.rows[J.d.slice(0, 7)]; if (!R) return;
   var g = ljGroup(ljDayRows(J.d))[i]; if (!g) return;
-  var p = isoParts(J.d), jobs = g.jobs.slice().sort(function (a, b) { return (a.d + ' ' + a.s).localeCompare(b.d + ' ' + b.s); });
+  var p = isoParts(J.d), mn = ljMin(g.nm, J.d), jobs = g.jobs.slice().sort(function (a, b) { return (a.d + ' ' + a.s).localeCompare(b.d + ' ' + b.s); });
   showModal('<div class="sh-head"><b>History Pengerjaan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
     '<div class="lj-hs">' + esc(g.nm) + '<small>NIP ' + esc(g.nip) + ' &middot; ' + esc(g.bg) + ' &middot; ' + esc(g.jb) + (g.sh ? ' &middot; Shift ' + g.sh : '') + '<br>' + HARI[isoDow(J.d)] + ', ' + p.d + ' ' + BULAN[p.m - 1] + ' ' + p.y + '</small></div>' +
     '<div class="lj-hl">' + jobs.map(function (r) {
@@ -1139,8 +1152,8 @@ function ljHist(i) {
         (done && !tdr && r.ap === 'Disetujui' ? '<div class="lj-ap ok">' + ic('shield', 'sm') + ' Disetujui pengawas' + (r.pw ? ': ' + esc(r.pw) : '') + (r.wa ? ' &middot; ' + esc(r.wa) : '') + '</div>'
           : (done && !tdr && r.ap === 'Menunggu' ? '<div class="lj-ap wait">' + ic('shield', 'sm') + ' Menunggu approval pengawas</div>' : '')) + '</div>';
     }).join('') + '</div>' +
-    '<div class="lj-ht2"><span>' + g.jobs.length + ' pengerjaan</span><span class="' + (g.tot >= JAM_MIN ? 'lj-ok' : 'lj-low') + '">Total ' + (g.fin ? jamTxt(g.tot) : '-') + ' (' + g.tot + ' menit)</span></div>' +
-    '<div class="lj-leg" style="margin-top:6px">' + (g.tot >= JAM_MIN ? 'Sudah mencapai' : 'Belum mencapai') + ' jam kerja minimal ' + JAM_MIN + ' menit per hari.</div>');
+    '<div class="lj-ht2"><span>' + g.jobs.length + ' pengerjaan</span><span class="' + (g.tot >= mn ? 'lj-ok' : 'lj-low') + '">Total ' + (g.fin ? jamTxt(g.tot) : '-') + ' (' + g.tot + ' menit)</span></div>' +
+    '<div class="lj-leg" style="margin-top:6px">' + (g.tot >= mn ? 'Sudah mencapai' : 'Belum mencapai') + ' jam kerja minimal ' + mn + ' menit' + (mn !== JAM_MIN ? ' (setengah hari)' : ' per hari') + '.</div>');
 }
 
 /* ---------- list rendering ---------- */
@@ -3720,41 +3733,59 @@ function rdTable(rows) {
   var mlbl = R.fm ? (R.fm === RD_KOSONG ? 'Tanpa mekanik' : (R.fmn || R.fm)) : 'Mekanik sebelumnya';
   return '<div class="rd-w"><table class="rd-tbl"><thead><tr><th>No</th><th><button type="button" class="rd-flt' + (R.f ? ' on' : '') + '" data-act="rdflt" aria-label="Pilih jenis laporan">' + (R.f ? esc(R.f) : 'Jenis laporan') + ic('down', 'sm') + '</button></th><th>Nomor mobil</th><th>Isi keluhan</th><th>Service sebelumnya</th><th><button type="button" class="rd-flt' + (R.fm ? ' on' : '') + '" data-act="rdmflt" aria-label="Pilih nama mekanik sebelumnya">' + esc(mlbl) + ic('down', 'sm') + '</button></th><th>Keterangan</th><th>Mekanik yang kerjakan</th></tr></thead><tbody>' + tr + '</tbody></table></div>';
 }
-/* ---- CK mekanik Teknik: akumulasi sebulan ----
+/* ---- Redo mekanik (tabel CK per mekanik Teknik): akumulasi sebulan; judul: jumlah service Teknik + Keindahan (tab MEKANIK) dan persen = total CK / (service Teknik + Keindahan) ----
    Mekanik = user Pengaturan berbagian Teknik (server: tk). Satu CK dihitung ke "Mekanik sebelumnya" (mekanik yang mengerjakan service terakhir mobil itu) dari tiap laporan Redo Job berjenis CK
    (Kerusakan lain ikut; Cek baik tidak). Harian: dari tanggal 1 sampai tanggal yang dipilih; Bulanan: satu bulan penuh. Mekanik tanpa CK = bagus. */
 function rdNama(s) { return String(s || '').replace(/(^|\s)([a-z])/g, function (m, a, b) { return a + b.toUpperCase(); }); }
 function rdMkData() {
-  var R = S.rd, D = R.rows[rdYm()]; if (!D || !D.tk || !D.tk.length) return null;
-  var cut = R.mode === 'bulan' ? '9999-99-99' : R.d, cnt = D.tk.map(function () { return 0; }), lain = {}, nol = 0;
+  var R = S.rd, D = R.rows[rdYm()], tk = D && D.tk || [], gk = D && D.gk || []; if (!D || (!tk.length && !gk.length)) return null;
+  var cut = R.mode === 'bulan' ? '9999-99-99' : R.d, cnt = tk.map(function () { return 0; }), cg = gk.map(function () { return 0; }), lain = {}, nol = 0;
   D.rows.forEach(function (r) {
     if (r.jn !== 'CK' || r.d > cut) return;
-    if (r.mi >= 0 && r.mi < cnt.length) cnt[r.mi]++;
+    if (r.gi >= 0 && r.gi < cg.length) cg[r.gi]++;          /* CK yang dipilih pengawas Keindahan / TB: atas nama mekanik sebelumnya dari bagian itu (server: gk) */
+    else if (r.mi >= 0 && r.mi < cnt.length) cnt[r.mi]++;
     else if (r.ms) lain[r.ms] = (lain[r.ms] || 0) + 1;
     else nol++;
   });
-  return { tk: D.tk, cnt: cnt, lain: lain, nol: nol, err: D.e || '' };
+  var sv = null;          // jumlah service Teknik / Keindahan / TB dari tab MEKANIK: tanggal 1 sampai tanggal dipilih (Harian) atau satu bulan (Bulanan); hb = server sudah menghitung TB
+  if (D.sv) { sv = { t: 0, k: 0, b: 0, hb: 0 }; Object.keys(D.sv).forEach(function (d) { if (d <= cut) { sv.t += D.sv[d][0] || 0; sv.k += D.sv[d][1] || 0; sv.b += D.sv[d][2] || 0; } if (D.sv[d].length > 2) sv.hb = 1; }); }
+  return { tk: tk, cnt: cnt, gk: gk, cg: cg, lain: lain, nol: nol, sv: sv, err: D.e || '' };
 }
 function rdMkRange() {
   var R = S.rd, p = isoParts(R.mode === 'bulan' ? R.rm + '-01' : R.d), bl = BULAN[p.m - 1] + ' ' + p.y;
   return R.mode === 'bulan' ? bl : (+p.d === 1 ? '1 ' + bl : '1 – ' + (+p.d) + ' ' + bl);
 }
+function rdMkHead(M, tot) {
+  var sv = M.sv, n = sv ? sv.t + sv.k + sv.b : 0, pct = n ? Math.round(tot * 100 / n) + '%' : '-';
+  return '<div class="rdm-h"><div class="rdm-t">Redo mekanik<small>Akumulasi ' + esc(rdMkRange()) + '</small></div>' +
+    (sv && !M.err ? '<div class="rdm-sv"><div><span>Jumlah Service Teknik</span><b>' + sv.t + ' unit</b></div><div><span>Jumlah Service Keindahan</span><b>' + sv.k + ' unit</b></div>' + (sv.hb ? '<div><span>Jumlah Service TB</span><b>' + sv.b + ' unit</b></div>' : '') + '</div><div class="rdm-pc" title="Total CK dibagi (service Teknik + Keindahan' + (sv.hb ? ' + TB' : '') + ')"><b>' + pct + '</b><small>CK ' + tot + '</small></div>' : '') + '</div>';
+}
+function rdMkRow(x, mx) {
+  var c = x.c;
+  return '<tr><td class="nm">' + esc(rdNama(x.n)) + '</td><td>' + esc(rdNama(x.bg) || '-') + '</td><td>' + esc(x.jb || '-') + '</td><td class="n">' + c + '</td><td class="g">' +
+    (c ? '<div class="rdm-bar" role="img" aria-label="' + c + ' CK"><i style="width:' + Math.max(4, Math.round(c * 100 / mx)) + '%"></i></div>' : '<span class="rdm-ok">Bagus</span>') + '</td></tr>';
+}
 function rdMk() {
   var M = rdMkData(); if (!M) return '';
-  var head = '<div class="rdm-h">CK mekanik Teknik<small>Akumulasi ' + esc(rdMkRange()) + '</small></div>';
-  if (M.err) return '<div class="rdm">' + head + '<div class="rd-note">Mekanik sebelumnya belum terbaca dari data aplikasi, jadi jumlah CK belum bisa dihitung: ' + esc(M.err) + '</div></div>';
-  var ix = M.tk.map(function (m, i) { return i; }).sort(function (a, b) { return M.cnt[b] - M.cnt[a] || (M.tk[a].n.toLowerCase() < M.tk[b].n.toLowerCase() ? -1 : 1); });
-  var mx = Math.max.apply(null, M.cnt.concat([5])), tot = 0, tr = '';
-  ix.forEach(function (i) {
-    var m = M.tk[i], c = M.cnt[i]; tot += c;
-    tr += '<tr><td class="nm">' + esc(rdNama(m.n)) + '</td><td>' + esc(rdNama(m.bg) || '-') + '</td><td>' + esc(m.jb || '-') + '</td><td class="n">' + c + '</td><td class="g">' +
-      (c ? '<div class="rdm-bar" role="img" aria-label="' + c + ' CK"><i style="width:' + Math.max(4, Math.round(c * 100 / mx)) + '%"></i></div>' : '<span class="rdm-ok">Bagus</span>') + '</td></tr>';
+  if (M.err) return '<div class="rdm">' + rdMkHead(M, 0) + '<div class="rd-note">Mekanik sebelumnya belum terbaca dari data aplikasi, jadi jumlah CK belum bisa dihitung: ' + esc(M.err) + '</div></div>';
+  var all = [], gs = ['Teknik', 'Keindahan', 'TB'], tot = 0, tr = '', nb = 0, mx;
+  M.tk.forEach(function (m, i) { all.push({ g: 'Teknik', n: m.n, bg: m.bg, jb: m.jb, c: M.cnt[i] }); });
+  M.gk.forEach(function (m, i) { all.push({ g: m.g, n: m.n, bg: m.bg || m.g, jb: m.jb, c: M.cg[i] }); });
+  mx = Math.max.apply(null, all.map(function (x) { return x.c; }).concat([5]));
+  gs.forEach(function (g) { if (all.some(function (x) { return x.g === g; })) nb++; });
+  gs.forEach(function (g) {
+    var L = all.filter(function (x) { return x.g === g; }).sort(function (a, b) { return b.c - a.c || (a.n.toLowerCase() < b.n.toLowerCase() ? -1 : 1); }), sub = 0;
+    if (!L.length) return;
+    L.forEach(function (x) { sub += x.c; });
+    tot += sub;
+    if (nb > 1) tr += '<tr class="rd-day"><td colspan="5">' + g + ' &middot; ' + sub + ' CK</td></tr>';          /* lebih dari satu bagian: tiap bagian diberi judul + jumlah CK-nya */
+    L.forEach(function (x) { tr += rdMkRow(x, mx); });
   });
   var lain = Object.keys(M.lain).map(function (k) { return esc(k) + ' (' + M.lain[k] + ')'; }), fn = [];
   if (lain.length) fn.push('Mekanik sebelumnya di luar daftar Teknik (tidak dihitung): ' + lain.join(', ') + '.');
   if (M.nol) fn.push(M.nol + ' laporan CK tanpa data mekanik sebelumnya (tidak dihitung).');
-  return '<div class="rdm">' + head + '<div class="rd-w"><table class="rd-tbl rdm-tbl"><thead><tr><th>Nama</th><th>Bagian</th><th>Jabatan</th><th class="n">Jumlah CK</th><th>Grafik</th></tr></thead><tbody>' + tr + '</tbody></table></div>' +
-    '<div class="rdm-fn">Total ' + tot + ' CK. Dihitung dari laporan di atas yang berjenis CK (Kerusakan lain ikut, Cek baik tidak), atas nama Mekanik sebelumnya.' + (fn.length ? ' ' + fn.join(' ') : '') + '</div></div>';
+  return '<div class="rdm">' + rdMkHead(M, tot) + '<div class="rd-w"><table class="rd-tbl rdm-tbl"><thead><tr><th>Nama</th><th>Bagian</th><th>Jabatan</th><th class="n">Jumlah CK</th><th>Grafik</th></tr></thead><tbody>' + tr + '</tbody></table></div>' +
+    '<div class="rdm-fn">Total ' + tot + ' CK. Dihitung dari laporan di atas yang berjenis CK (Kerusakan lain ikut, Cek baik tidak), atas nama Mekanik sebelumnya' + (M.gk.length ? ': mekanik yang mengerjakan service terakhir mobil itu pada bagian yang dipilih pengawas (Teknik, Keindahan, atau TB)' : '') + '.' + (M.sv ? ' Persen = Total CK dibagi (Jumlah Service Teknik + Keindahan' + (M.sv.hb ? ' + TB' : '') + '); jumlah service dari kolom SERVICE di tab MEKANIK.' : '') + (fn.length ? ' ' + fn.join(' ') : '') + '</div></div>';
 }
 function rdBody() {
   var R = S.rd, sc = rdScope();
@@ -4341,9 +4372,19 @@ function bkaTing(force) {          /* hasil: false bila perangkat tidak mendukun
   return true;
 }
 window.BKA_TING = TING; window.BKA_TING_PLAY = bkaTing;          /* kait untuk pengujian */
-/* pemberitahuan reservasi baru untuk ASGH / Gudang (selain angka merah): muncul sekali saat data baru masuk, bukan saat pertama kali dimuat */
+/* Akun di luar ASGH / Gudang / Approval yang juga diberi bunyi bila ada reservasi baru menunggu ACC. Isi dengan NIP atau nama depan akun (huruf besar-kecil tidak berpengaruh).
+   Akun ini tetap harus punya akses menu Reservasi (kode RESERVASI) di Pengaturan > User & Akses, kalau tidak data Reservasi tidak diterima. */
+var RS_TING_EXTRA = ['odhi'];
+function rsTingExtra() {
+  var m = S.me; if (!m) return false;
+  var nip = String(m.nip || '').trim().toLowerCase(), nm = String(m.nama || '').trim().toLowerCase(), fn = nm.split(/\s+/)[0];
+  return RS_TING_EXTRA.some(function (x) { x = String(x).trim().toLowerCase(); return !!x && (x === nip || x === nm || x === fn); });
+}
+function rsTingAcc() { return isApv() || rsTingExtra(); }          /* Group Head / Section Head (akses Approval) + akun tambahan */
+/* pemberitahuan reservasi baru untuk ASGH / Gudang (selain angka merah): muncul sekali saat data baru masuk, bukan saat pertama kali dimuat.
+   Group Head / Section Head (Approval) dan akun tambahan: bunyi + pesan saat ada reservasi baru yang menunggu ACC. */
 function rsNotify() {
-  var R = S.rs, g = {}, a = {}, ms = [];
+  var R = S.rs, g = {}, a = {}, p = {}, ms = [];
   if (rsOps()) rsCards().forEach(function (d) { if (rsNeedG(d)) g[d.id] = d; if (rsNeedA(d)) a[d.id + ':' + d.st] = d; });
   if (R.kg && R.ka) {
     Object.keys(g).forEach(function (k) { if (!R.kg[k]) ms.push('Reservasi baru ' + g[k].n + '. Persiapkan barang segera!'); });
@@ -4352,8 +4393,13 @@ function rsNotify() {
       ms.push(d.st === 'Disetujui' ? d.n + ' sudah di-ACC. Buatkan reservasinya!' : 'Reservasi baru ' + d.n + ' masuk, menunggu ACC.');
     });
   }
-  R.kg = {}; R.ka = {};
-  Object.keys(g).forEach(function (k) { R.kg[k] = 1; }); Object.keys(a).forEach(function (k) { R.ka[k] = 1; });
+  if (rsTingAcc()) (R.pend || []).forEach(function (d) { if (d.st === 'Menunggu' && !rsMine(d)) p[d.id] = d; });
+  if (R.kp) Object.keys(p).forEach(function (k) {          /* reservasi baru menunggu ACC (SH / GH / akun tambahan) */
+    if (R.kp[k] || (g[k] && !R.kg[k]) || (a[k + ':Menunggu'] && !R.ka[k + ':Menunggu'])) return;          /* sudah masuk pemberitahuan ASGH / Gudang: jangan dobel */
+    ms.push('Reservasi baru ' + p[k].n + ' menunggu ACC Anda.');
+  });
+  R.kg = {}; R.ka = {}; R.kp = {};
+  Object.keys(g).forEach(function (k) { R.kg[k] = 1; }); Object.keys(a).forEach(function (k) { R.ka[k] = 1; }); Object.keys(p).forEach(function (k) { R.kp[k] = 1; });
   if (ms.length) { toast(ms[0] + (ms.length > 1 ? ' (+' + (ms.length - 1) + ' lagi)' : '')); bkaTing(); }
 }
 function rsBadge() {
@@ -4494,6 +4540,138 @@ function rsLapCard(d) {
       : rsPills(d) + (acc ? '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>' : '')) +
     (bt ? '<div class="rs-bts">' + bt + '</div>' : '') + '</div>';
 }
+/* ---- Laporan: reservasi untuk MOBIL YANG SAMA digabung jadi satu kartu (satu daftar barang), walau mekanik reservasi lagi (Susulan / Manual).
+   Selama pengerjaan mobil itu BELUM SELESAI tetap satu laporan; setelah semua pengerjaan yang direservasi selesai, reservasi berikutnya untuk mobil yang sama jadi laporan baru.
+   d.fn dari server (getReservasi): ms selesainya pengerjaan reservasi itu, 0 = belum selesai, -1 = tidak diketahui (dianggap sudah selesai). Server lama tanpa fn: satu mobil per hari.
+   Di sheet tiap reservasi tetap sendiri (ACC, tanda direservasi, tanda Gudang per reservasi); kartu ini hanya menampilkan dan menggerakkannya bersama. ---- */
+function rsJoin(g, d, hasFn) {
+  if (!hasFn) return isoOf(new Date(g[g.length - 1].at)) === isoOf(new Date(d.at));
+  var end = 0;
+  g.forEach(function (m) { var e = m.fn > 0 ? m.fn : m.fn === 0 ? Infinity : m.at; if (e > end) end = e; });          /* masih ada pengerjaan yang belum selesai -> Infinity */
+  return d.at <= end;
+}
+function rsGroupAll(base) {
+  var byCar = {}, out = [], hasFn = base.some(function (d) { return d.fn !== undefined; });
+  base.slice().sort(function (a, b) { return a.at - b.at; }).forEach(function (d) {
+    var k = String(d.n || '').toUpperCase(), L = byCar[k] || (byCar[k] = []), cur = L[L.length - 1];
+    if (cur && rsJoin(cur, d, hasFn)) cur.push(d); else { cur = [d]; L.push(cur); out.push(cur); }
+  });
+  return out;
+}
+/* kartu Laporan = kelompok per mobil; tampil bila salah satu reservasinya lolos tanggal / pencarian (kartu memuat semua barang kelompok itu) */
+function rsLapGroups() {
+  var R = S.rs, vis = {}, base = (rsOps() ? R.pend || [] : []).concat(R.done || []);
+  rsLapRows().forEach(function (d) { vis[d.id] = 1; });
+  var arr = rsGroupAll(base).filter(function (g) { return g.some(function (d) { return vis[d.id]; }); });
+  arr.sort(function (a, b) { return (b.some(function (d) { return rsNeed(d); }) ? 1 : 0) - (a.some(function (d) { return rsNeed(d); }) ? 1 : 0) || b[b.length - 1].at - a[a.length - 1].at; });
+  return arr;
+}
+function rsIds(g, fn) { return g.filter(fn || function () { return true; }).map(function (d) { return d.id; }).join(','); }
+function rsUniq(a) { var s = {}, o = []; a.forEach(function (x) { if (x && !s[x]) { s[x] = 1; o.push(x); } }); return o; }
+function rsAccLine(d) { return '<div class="ap-st ok">' + ic('shield', 'sm') + '<span>Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) + '</span></div>'; }
+function rsLapCards(g) { return g.length > 1 ? rsLapGroupCard(g) : rsLapCard(g[0]); }
+function rsLapGroupCard(g) {
+  var ap = rsAsgh(), gd = rsGdg(), last = g[g.length - 1];
+  var acc = g.filter(function (d) { return d.st === 'Disetujui'; }), nl = g.filter(function (d) { return !d.lg; });          /* nl = reservasi dengan alur baru (data lama tidak punya tanda reservasi / gudang) */
+  var accAll = acc.length === g.length, its = [], bn = '', pills = '', bt = '', ketHtml = '';
+  g.forEach(function (d) { rsOrdered(d).forEach(function (x) { its.push({ d: d, x: x }); }); });
+  its = its.filter(function (o) { return !o.x.rv; }).concat(its.filter(function (o) { return o.x.rv; }));          /* belum direservasi di atas, sudah di bawah */
+  var li = its.map(function (o) {
+    var d = o.d, x = o.x, id = esc(d.id), act = ap && d.st === 'Disetujui' && !d.lg;
+    return '<li' + (x.rv ? ' class="rv"' : '') + '><span class="rs-dot"></span><b>' + esc(x.t) + '</b>' + (x.man && !d.rj ? '<em class="mn">tambahan</em>' : '') +
+      (d.lg ? '' : x.rv ? (act ? '<button class="rs-undo" data-act="rsrvx" data-a="' + id + '" data-b="' + x.i + '">Batal</button>' : '<em>Sudah direservasi</em>')
+        : (act ? '<button class="rs-do" data-act="rsrv" data-a="' + id + '" data-b="' + x.i + '">' + ic('check', 'sm') + ' Direservasi</button>' : '')) + '</li>';
+  }).join('');
+  if (gd && nl.length) {
+    var sbAll = nl.every(function (d) { return d.sb; }), sbLast = nl.filter(function (d) { return d.sb; }).sort(function (a, b) { return (b.sw || 0) - (a.sw || 0); })[0];
+    bn += sbAll ? '<div class="rs-bn ok">' + ic('check', 'sm') + '<span>Barang sudah disiapkan &middot; ' + esc(sbLast.sb) + (sbLast.sw ? ' &middot; ' + hm(sbLast.sw) + ' &middot; ' + pkDmy(sbLast.sw) : '') + '</span></div>'
+      : '<div class="rs-bn hot">' + ic('warn', 'sm') + '<span><b>Persiapkan barang segera.</b> ' + (nl.some(function (d) { return d.sb; }) ? 'Sebagian sudah disiapkan. ' : '') + (accAll ? 'Sudah di-ACC.' : 'Boleh disiapkan sekarang, tidak perlu menunggu ACC.') + '</span></div>';
+  }
+  if (ap && nl.length) {
+    var accNl = nl.filter(function (d) { return d.st === 'Disetujui'; }), todo = accNl.filter(function (d) { return !rsAllRv(d); }), wait = nl.filter(function (d) { return d.st !== 'Disetujui'; });
+    if (todo.length) bn += '<div class="rs-bn hot">' + ic('warn', 'sm') + '<span><b>Sudah di-ACC. Buatkan reservasinya.</b> Tandai barang yang sudah direservasi.' + (wait.length ? ' Ada reservasi lain yang masih menunggu ACC.' : '') + '</span></div>';
+    else if (wait.length) bn += '<div class="rs-bn wait">' + ic('clock', 'sm') + '<span>Menunggu ACC Group Head / Section Head. Setelah di-ACC, buatkan reservasinya.</span></div>';
+    else {
+      var rl = accNl.filter(function (d) { return d.rb; }).sort(function (a, b) { return (b.rw || 0) - (a.rw || 0); })[0] || accNl[0];
+      bn += '<div class="rs-bn ok">' + ic('check', 'sm') + '<span>Semua barang sudah direservasi &middot; ' + esc(rl.rb || '-') + (rl.rw ? ' &middot; ' + hm(rl.rw) + ' &middot; ' + pkDmy(rl.rw) : '') + '</span></div>';
+    }
+  }
+  if (nl.length) {
+    var itn = its.filter(function (o) { return !o.d.lg; }), nRv = itn.filter(function (o) { return o.x.rv; }).length, sbOk = nl.every(function (d) { return d.sb; });
+    pills = '<div class="rs-pills"><span class="rs-pl ' + (accAll ? 'ok' : 'wt') + '">' + (accAll ? 'Di-ACC' : acc.length ? 'Di-ACC ' + acc.length + '/' + g.length : 'Menunggu ACC') + '</span>' +
+      '<span class="rs-pl ' + (itn.length && nRv >= itn.length ? 'ok' : nRv ? 'pt' : 'no') + '">Reservasi ' + nRv + '/' + itn.length + '</span>' +
+      '<span class="rs-pl ' + (sbOk ? 'ok' : 'no') + '">' + (sbOk ? 'Gudang sudah siap' : 'Gudang belum siap') + '</span></div>';
+  }
+  var rvIds = rsIds(g, function (d) { return ap && d.st === 'Disetujui' && !d.lg && rsOrdered(d).some(function (x) { return !x.rv; }); });
+  if (rvIds) bt += '<button class="btn pkdone ap-bt" data-act="rsrvgrp" data-a="' + rvIds + '">' + ic('check', 'sm') + ' Semua barang sudah direservasi</button>';
+  if (gd && nl.length) {
+    var sbOn = rsIds(nl, function (d) { return !d.sb; }), sbOff = rsIds(nl, function (d) { return d.sb; });
+    bt += sbOn ? '<button class="btn pkdone ap-bt" data-act="rssiapgrp" data-a="' + sbOn + '" data-b="1">' + ic('check', 'sm') + ' Barang sudah disiapkan</button>'
+      : '<button class="btn ghost ap-bt" data-act="rssiapgrp" data-a="' + sbOff + '" data-b="0">Batalkan tanda disiapkan</button>';
+  }
+  if (acc.length) bt += '<button class="btn ghost ap-bt" data-act="rsviewgrp" data-a="' + rsIds(g) + '">' + ic('report', 'sm') + ' Laporan Reservasi</button>';
+  var again = g.filter(function (d) { return d.st === 'Disetujui' && !d.lg && rsMek() && rsMy(d); }).pop();
+  if (again) bt += '<button class="btn ghost ap-bt" data-act="rsagain" data-a="' + esc(again.id) + '">' + ic('plus', 'sm') + ' Butuh reservasi lagi</button>';
+  var kets = g.filter(function (d) { return d.ket; });
+  if (kets.length) ketHtml = '<div class="ap-tx"><small>Keterangan</small>' + (kets.length === 1 ? esc(kets[0].ket) : kets.map(function (d) { return esc(rsLbl(d)) + ': ' + esc(d.ket); }).join('<br>')) + '</div>';
+  var accTx = rsUniq(g.filter(function (d) { return d.lg || d.st === 'Disetujui'; }).map(rsAccLine)).join('');
+  return '<div class="ap-card rs-card' + (g.some(rsNeed) ? '' : ' done') + '" data-rs="' + esc(g[0].id) + '"><div class="ap-c1">' + nchip(g[0].n) + rsUniq(g.map(rsPill)).join('') + '<span class="ap-ago">' + esc(pkDmy(last.at)) + ' ' + hm(last.at) + '</span></div>' +
+    '<div class="ap-c2"><b>' + esc(rsUniq(g.map(function (d) { return d.mk; })).join(' / ') || '-') + '</b><span>' + esc((g.filter(function (d) { return d.jn; })[0] || {}).jn || '-') + '</span></div>' + bn +
+    '<div class="ap-tx"><small>Barang (' + its.length + ')</small>' + (li ? '<ul class="rs-items rs-lst">' + li + '</ul>' : '<span class="rs-none">Tidak ada barang</span>') + '</div>' +
+    ketHtml + pills + accTx + (bt ? '<div class="rs-bts">' + bt + '</div>' : '') + '</div>';
+}
+/* tombol kartu gabungan: beberapa reservasi ditandai berurutan (id dipisah koma), lalu daftar dimuat ulang sekali */
+function rsReserveMany(ids) {
+  var R = S.rs, q;
+  if (!rsAsgh()) { toast('Hanya akun ASGH yang menandai barang sudah direservasi.', true); return; }
+  q = ids.filter(function (id) { var d = rsAny(id); return d && !d.lg && d.st === 'Disetujui' && rsOrdered(d).some(function (x) { return !x.rv; }); });
+  if (!q.length) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
+  if (R.rsb) return;
+  R.rsb = 1;
+  (function next() {
+    if (!q.length) { R.rsb = 0; R.h = ''; rsBadge(); rsListUi(); toast('Semua barang sudah direservasi'); rsFetch(true); return; }
+    var id = q.shift(), d = rsAny(id);
+    gs('rsvReserve', [{ u: meNip(), id: id, on: 1, all: 1 }]).then(function (r) {
+      if (d && r && r.rv) { d.rv = r.rv; d.rb = r.rb || ''; d.rw = r.rw || 0; }
+      next();
+    }, function (e) { R.rsb = 0; R.h = ''; rsBadge(); rsListUi(); toast(rsMsg(e), true); rsFetch(true); });
+  })();
+}
+function rsSiapMany(ids, on) {
+  var R = S.rs, q;
+  if (!rsGdg()) { toast('Hanya akun Gudang yang menandai barang sudah disiapkan.', true); return; }
+  q = ids.filter(function (id) { var d = rsAny(id); return d && !d.lg && (on ? !d.sb : !!d.sb); });
+  if (!q.length) { toast('Data Reservasi sudah berubah, memuat ulang.', true); rsFetch(true); return; }
+  if (R.rsb) return;
+  R.rsb = 1;
+  (function next() {
+    if (!q.length) { R.rsb = 0; R.h = ''; rsBadge(); rsListUi(); toast(on ? 'Barang ditandai sudah disiapkan' : 'Tanda disiapkan dibatalkan'); rsFetch(true); return; }
+    var id = q.shift(), d = rsAny(id);
+    gs('rsvSiap', [{ u: meNip(), id: id, on: on }]).then(function (r) {
+      if (d && r && r.ok) { d.sb = r.sb || ''; d.sw = r.sw || 0; }
+      next();
+    }, function (e) { R.rsb = 0; R.h = ''; rsBadge(); rsListUi(); toast(rsMsg(e), true); rsFetch(true); });
+  })();
+}
+/* Laporan Reservasi untuk kartu gabungan: satu tabel barang dari semua reservasi mobil itu */
+function rsViewGroup(list) {
+  var rows = [], mk = rsUniq(list.map(function (d) { return d.mk; })).join(' / ') || '-', jn = (list.filter(function (d) { return d.jn; })[0] || {}).jn || '-', kets = list.filter(function (d) { return d.ket; });
+  list.forEach(function (d) { rsOrdered(d).forEach(function (x) { rows.push({ d: d, x: x }); }); });
+  rows = rows.filter(function (r) { return !r.x.rv; }).concat(rows.filter(function (r) { return r.x.rv; }));
+  showModal('<div class="sh-head"><b>Laporan Reservasi</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
+    '<div class="pkapsum"><b class="no">#' + esc(list[0].n) + '</b> ' + rsUniq(list.map(rsPill)).join(' ') +
+    '<dl class="kv"><dt>Jenis</dt><dd>' + esc(jn) + '</dd><dt>Mekanik</dt><dd>' + esc(mk) + '</dd>' +
+    list.map(function (d) {
+      return '<dt>' + esc(rsLbl(d)) + '</dt><dd>Diajukan ' + esc(d.by || '-') + ' &middot; ' + pkDmy(d.at) + ' ' + hm(d.at) + '<br>' +
+        (d.st === 'Disetujui' ? 'Di-ACC ' + esc(d.ap || '-') + ' &middot; ' + hm(d.aw) + ' &middot; ' + pkDmy(d.aw) : 'Menunggu ACC') +
+        (d.lg ? '' : '<br>Direservasi: ' + (d.rb ? esc(d.rb) + (d.rw ? ' &middot; ' + hm(d.rw) + ' &middot; ' + pkDmy(d.rw) : '') : 'Belum') +
+          '<br>Gudang: ' + (d.sb ? 'Disiapkan ' + esc(d.sb) + (d.sw ? ' &middot; ' + hm(d.sw) + ' &middot; ' + pkDmy(d.sw) : '') : 'Belum disiapkan')) + '</dd>';
+    }).join('') + '</dl></div>' +
+    '<table class="rs-tbl"><thead><tr><th>No</th><th>Barang</th><th>Sumber</th><th>Status</th></tr></thead><tbody>' +
+    rows.map(function (r, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(r.x.t) + '</td><td>' + esc(r.x.man ? (r.d.rj || 'Tambahan') : 'Otomatis') + '</td><td>' + (r.d.lg ? '-' : r.x.rv ? 'Sudah direservasi' : 'Belum') + '</td></tr>'; }).join('') + '</tbody></table>' +
+    (kets.length ? '<div class="ap-tx" style="margin-top:8px"><small>Keterangan</small>' + (kets.length === 1 ? esc(kets[0].ket) : kets.map(function (d) { return esc(rsLbl(d)) + ': ' + esc(d.ket); }).join('<br>')) + '</div>' : '') +
+    '<button class="btn full pkbtn" data-act="rsxlg" data-a="' + esc(rsIds(list)) + '">' + ic('report', 'sm') + ' Unduh Excel</button>');
+}
 /* tanggal Reservasi (berlaku untuk ketiga tab): ms termasuk tanggal yang dipilih? carry = yang masih menunggu tindakan ikut tampil di hari ini walau berasal dari hari sebelumnya */
 function rsInDay(ms, carry) {
   var d0 = rsDayCur(), t0 = todayIso(), dd;
@@ -4541,13 +4719,13 @@ function rsListHtml() {
       : '<div class="empty">Tidak ada reservasi yang menunggu ACC pada tanggal ini.</div>'; }
   else {
     var rows = rsLapRows();
-    body = rows.length ? '<div class="ap-list">' + rows.map(rsLapCard).join('') + '</div>' : '<div class="empty">' + esc(rsLapEmpty()) + '</div>';
+    body = rows.length ? '<div class="ap-list">' + rsLapGroups().map(rsLapCards).join('') + '</div>' : '<div class="empty">' + esc(rsLapEmpty()) + '</div>';
   }
   return body;
 }
 function rsListUi() { var el = $('#rs_list'); if (el && S.view === 'rsv') el.innerHTML = rsListHtml(); }
 function vRsv() {
-  var R = S.rs, tab = rsTab(), nI = R.cand ? rsCandRows().length : 0, nA = R.cand ? rsPendRows().length : 0, nL = R.cand ? rsLapRows().length : 0, only = rsOpsOnly();
+  var R = S.rs, tab = rsTab(), nI = R.cand ? rsCandRows().length : 0, nA = R.cand ? rsPendRows().length : 0, nL = R.cand ? rsLapGroups().length : 0, only = rsOpsOnly();
   var tabs = only ? '' : '<div class="ls-mode ap-tabs rs-tabs">' +
     [['isi', 'Perlu diisi', nI], ['acc', 'Menunggu ACC', nA], ['lap', 'Laporan', nL]].map(function (t) { return '<button class="' + (tab === t[0] ? 'on' : '') + '" data-act="rstab" data-a="' + t[0] + '">' + t[1] + (R.cand ? ' (' + t[2] + ')' : '') + '</button>'; }).join('') + '</div>';
   var note = only ? (rsGdg() && rsAsgh() ? 'Reservasi dari mekanik langsung tampil di sini. <b>Gudang:</b> persiapkan barang segera, tidak perlu menunggu ACC. <b>ASGH:</b> setelah di-ACC, buatkan reservasinya.'
@@ -4557,7 +4735,7 @@ function vRsv() {
     : 'Mobil yang sedang dikerjakan Service Teknik otomatis masuk di sini lengkap dengan barang yang harus diganti. Pilih reservasi atau tidak; bila ya, Group Head / Section Head akan meng-ACC.';
   return '<div class="subhead"><button class="back" data-act="back" aria-label="Kembali">' + ic('back') + '</button><h2>Reservasi</h2></div>' +
     '<section class="pad">' + errBanner() + rsNav() + '<div class="ap-note">' + ic('cal') + '<div>' + note + '</div></div>' +
-    (rsOps() ? '<button type="button" class="btn ghost rs-tes" data-act="rstes">' + ic('spark', 'sm') + ' Tes suara pemberitahuan</button>' : '') + tabs +
+    ((rsOps() || rsTingAcc()) ? '<button type="button" class="btn ghost rs-tes" data-act="rstes">' + ic('spark', 'sm') + ' Tes suara pemberitahuan</button>' : '') + tabs +
     (tab === 'lap' ? '<div class="rs-tools">' + searchBar('rs_q', 'Cari No Mobil...', R.q) + '<button class="btn ghost" data-act="rsxl">' + ic('report', 'sm') + ' Excel</button></div>' : '') +
     '<div id="rs_list">' + rsListHtml() + '</div>' + foot() + '</section>';
 }
@@ -4754,6 +4932,10 @@ var ACT = {
   rsrvx: function (a, b) { rsReserve(a, [+b], 0); },
   rsrvall: function (a) { rsReserve(a, null, 1); },
   rssiap: function (a, b) { rsSiap(a, b === '0' ? 0 : 1); },
+  rsrvgrp: function (a) { rsReserveMany(String(a || '').split(',')); },
+  rssiapgrp: function (a, b) { rsSiapMany(String(a || '').split(','), b === '0' ? 0 : 1); },
+  rsviewgrp: function (a) { var l = String(a || '').split(',').map(rsAny).filter(Boolean); if (l.length) rsViewGroup(l); },
+  rsxlg: function (a) { var l = String(a || '').split(',').map(rsAny).filter(Boolean); if (l.length) rsExport(l, 'Mobil ' + l[0].n, 'Laporan Reservasi ' + l[0].n + '.xlsx'); },
   rsvmanual: function () {
     var j = S.pk.job, k = rsvKind(j), R = S.rs; if (!j || !k || R.mb) return;
     var b = $('#rsvbtn'); R.mb = 1; if (b) b.disabled = true;
@@ -4827,7 +5009,7 @@ var ACT = {
     if (d) rsViewModal(d);
   },
   rsxl: function () {
-    var rows = rsLapRows(); if (!rows.length) { toast('Belum ada laporan untuk diunduh.', true); return; }
+    var rows = rsLapGroups().reduce(function (a, g) { return a.concat(g); }, []); if (!rows.length) { toast('Belum ada laporan untuk diunduh.', true); return; }
     var q = S.rs.q.trim(), dc = rsDayCur(), tg = dc === 'all' ? 'Semua tanggal' : 'Tanggal ' + pkDmy(Date.parse(dc + 'T12:00:00'));
     rsExport(rows, tg + '   |   Dicetak ' + pkDmy(Date.now()) + (q ? '   |   Cari : ' + q : ''), 'Laporan Reservasi ' + (dc === 'all' ? 'semua' : pkDmy(Date.parse(dc + 'T12:00:00')).replace(/\//g, '-')) + '.xlsx');
   },
@@ -5059,11 +5241,14 @@ var ACT = {
     var A = S.ap, p = isoParts(it.d);
     showModal('<div class="sh-head"><b>Setujui Pekerjaan</b><button data-act="closemodal" aria-label="Tutup">' + ic('x') + '</button></div>' +
       '<div class="pkapsum"><b class="no">#' + esc(it.n) + '</b> <span class="pill pk-' + esc(it.j) + '">' + esc(APJ[it.j] || it.j) + '</span>' +
-      '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(it.nm) + '</dd><dt>Waktu</dt><dd>' + p.d + '/' + p.m + '/' + p.y + ' &middot; ' + esc(it.s) + ' &ndash; ' + esc(it.e) + (it.m != null ? '<br><small class="mut">Lama ' + esc(jamTxt(it.m)) + '</small>' : '') + '</dd>' +
+      '<dl class="kv"><dt>Mekanik</dt><dd>' + esc(it.nm) + '</dd>' +
+      ((it.j === 'tb' || it.j === 'pem' || it.j === 'las') && it.dk ? '<dt>Detail kerusakan</dt><dd>' + esc(it.dk) + '</dd>' : '') +          /* Tabrak / Cat / PEM / Las: detail kerusakan dari laporan */
+      (it.j === 'teknik' && it.sv ? '<dt>Jenis service</dt><dd>' + esc(it.sv) + '</dd>' : '') +          /* Service Teknik: kode servis (S05, S12, ...) */
+      '<dt>Waktu</dt><dd>' + p.d + '/' + p.m + '/' + p.y + ' &middot; ' + esc(it.s) + ' &ndash; ' + esc(it.e) + (it.m != null ? '<br><small class="mut">Lama ' + esc(jamTxt(it.m)) + '</small>' : '') + '</dd>' +
       '<dt>' + apLbl(it) + '</dt><dd>' + esc(apTx(it) || '-') + '</dd>' +
       (it.j === 'tb' ? '<dt>Butuh PEM</dt><dd>' + (it.pem ? 'Ya' : 'Tidak') + '</dd>' : '') + '</dl></div>' +
       (it.j === 'ck' ? '<div class="pkkt"><label for="ap_kt">Keterangan <em>wajib dipilih</em></label><select id="ap_kt"><option value="">Pilih keterangan...</option>' + A.kt.map(function (q) { return '<option value="' + esc(q) + '">' + esc(apKetLbl(q)) + '</option>'; }).join('') + '</select></div>' +
-        '<div class="pkkt sub"><label for="ap_kb">Teknik atau Keindahan <em>wajib dipilih</em></label><select id="ap_kb"><option value="">Pilih Teknik / Keindahan...</option>' + A.kb.map(function (q) { return '<option value="' + esc(q) + '">' + esc(q) + '</option>'; }).join('') + '</select></div>' : '') +
+        '<div class="pkkt sub"><label for="ap_kb">Teknik, Keindahan, atau TB <em>wajib dipilih</em></label><select id="ap_kb"><option value="">Pilih Teknik / Keindahan / TB...</option>' + A.kb.map(function (q) { return '<option value="' + esc(q) + '">' + esc(q) + '</option>'; }).join('') + '</select></div>' : '') +
       (it.j === 'tb' ? '<div class="pkkt"><label for="ap_kq">Kualitas <em>wajib dipilih</em></label><select id="ap_kq"><option value="">Pilih kualitas...</option>' + A.kq.map(function (q) { return '<option value="' + esc(q) + '">' + esc(q) + '</option>'; }).join('') + '</select></div>' : '') +
       '<div class="ap-st ok" style="margin-top:12px">' + ic('shield', 'sm') + '<span>Disetujui atas nama <b>' + esc(meNama()) + '</b>. Setelah disetujui, pekerjaan dikunci dan tidak bisa dilanjutkan mekanik.</span></div>' +
       '<div id="ap_err" style="color:var(--red);font-size:13px;margin-top:8px"></div>' +
@@ -5074,7 +5259,7 @@ var ACT = {
     var er = $('#ap_err'), kt = '', kb = '', kq = '', f;
     if (it.j === 'ck') {
       f = $('#ap_kt'); kt = f ? f.value : ''; if (A.kt.indexOf(kt) < 0) { er.textContent = 'Pilih Keterangan dulu: CK, Cek baik, Kerusakan lain, CS, atau AFR.'; if (f) { f.classList.add('bad'); f.focus(); } return; }
-      f = $('#ap_kb'); kb = f ? f.value : ''; if (A.kb.indexOf(kb) < 0) { er.textContent = 'Pilih Teknik atau Keindahan dulu.'; if (f) { f.classList.add('bad'); f.focus(); } return; }
+      f = $('#ap_kb'); kb = f ? f.value : ''; if (A.kb.indexOf(kb) < 0) { er.textContent = 'Pilih Teknik, Keindahan, atau TB dulu.'; if (f) { f.classList.add('bad'); f.focus(); } return; }
     }
     if (it.j === 'tb') { f = $('#ap_kq'); kq = f ? f.value : ''; if (A.kq.indexOf(kq) < 0) { er.textContent = 'Pilih Kualitas dulu.'; if (f) { f.classList.add('bad'); f.focus(); } return; } }
     var bt = $('#ap_go'); A.saving = 1; if (bt) { bt.disabled = true; bt.textContent = 'Menyimpan...'; }
@@ -5101,7 +5286,7 @@ var ACT = {
       '<div class="pkapsum"><b class="no">#' + esc(it.n) + '</b> <span class="pill pk-ck">CK</span>' +
       '<dl class="kv"><dt>Kerusakan</dt><dd>' + esc(it.kl || '-') + '</dd><dt>Keterangan</dt><dd>' + esc(it.tk || '-') + '</dd><dt>Mekanik</dt><dd>' + esc(it.nm || '-') + '</dd><dt>Sekarang</dt><dd>' + (it.kt ? esc(apKetLbl(it.kt)) + (it.kb ? ' &middot; ' + esc(it.kb) : '') : '<span class="mut">Belum diisi</span>') + '</dd></dl></div>' +
       '<div class="pkkt"><label for="rv_kt">Jenis laporan <em>wajib dipilih</em></label><select id="rv_kt"><option value="">Pilih keterangan...</option>' + kts.map(function (q) { return '<option value="' + esc(q) + '"' + (q === it.kt ? ' selected' : '') + '>' + esc(apKetLbl(q)) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="pkkt sub"><label for="rv_kb">Teknik atau Keindahan <em>wajib dipilih</em></label><select id="rv_kb"><option value="">Pilih Teknik / Keindahan...</option>' + kbs.map(function (q) { return '<option value="' + esc(q) + '"' + (q === it.kb ? ' selected' : '') + '>' + esc(q) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="pkkt sub"><label for="rv_kb">Teknik, Keindahan, atau TB <em>wajib dipilih</em></label><select id="rv_kb"><option value="">Pilih Teknik / Keindahan / TB...</option>' + kbs.map(function (q) { return '<option value="' + esc(q) + '"' + (q === it.kb ? ' selected' : '') + '>' + esc(q) + '</option>'; }).join('') + '</select></div>' +
       '<div class="ap-st ok" style="margin-top:12px">' + ic('shield', 'sm') + '<span>Perubahan dicatat atas nama <b>' + esc(meNama()) + '</b>. Pengawas yang menyetujui dan waktu approval tidak berubah.</span></div>' +
       '<div id="ap_err" style="color:var(--red);font-size:13px;margin-top:8px"></div>' +
       '<button class="btn full pkdone" id="rv_go" data-act="aprevdo" data-a="' + esc(a) + '" style="margin-top:14px">' + ic('shield') + ' Simpan Revisi</button>');
@@ -5110,7 +5295,7 @@ var ACT = {
     var A = S.ap, er = $('#ap_err'), f1 = $('#rv_kt'), f2 = $('#rv_kb'), kt = f1 ? f1.value : '', kb = f2 ? f2.value : '';
     if (A.saving) return;
     if (A.kt.indexOf(kt) < 0) { er.textContent = 'Pilih Keterangan dulu: CK, Cek baik, Kerusakan lain, CS, atau AFR.'; if (f1) { f1.classList.add('bad'); f1.focus(); } return; }
-    if (A.kb.indexOf(kb) < 0) { er.textContent = 'Pilih Teknik atau Keindahan dulu.'; if (f2) { f2.classList.add('bad'); f2.focus(); } return; }
+    if (A.kb.indexOf(kb) < 0) { er.textContent = 'Pilih Teknik, Keindahan, atau TB dulu.'; if (f2) { f2.classList.add('bad'); f2.focus(); } return; }
     var bt = $('#rv_go'); A.saving = 1; if (bt) { bt.disabled = true; bt.textContent = 'Menyimpan...'; }
     gs('approvalRevisi', [{ u: meNip(), id: a, kt: kt, kb: kb }]).then(function (r) {
       A.saving = 0; closeModal(); rdApply(a, kt, kb);
